@@ -1,0 +1,159 @@
+---
+title: usePaginatedLoadAll
+description: React hook for automatically fetching all pages of paginated data
+---
+
+The `usePaginatedLoadAll` hook automatically fetches all pages of a paginated query and returns the complete result set.
+
+## Import
+
+```typescript
+import { usePaginatedLoadAll } from '@well-played.gg/react-sdk';
+```
+
+## Signature
+
+```typescript
+function usePaginatedLoadAll<TNodeChild, TData, TVariables>(
+  query: TypedDocumentNode<TData, TVariables> | TadaDocumentNode<TData, TVariables>,
+  options?: {
+    variables?: Omit<TVariables, "page">;
+    skip?: boolean;
+    onResults?: (results: TNodeChild[]) => void;
+  }
+): {
+  results: TNodeChild[];
+  loading: boolean;
+  refetch: (variables?: Omit<TVariables, "page">) => Promise<TNodeChild[]>;
+}
+```
+
+Source: `paginated-query.hook.ts:100-169`
+
+## Parameters
+
+<ParamField path="query" type="TypedDocumentNode" required>
+  A GraphQL query created with the `graphql` tagged template. The query must return a paginated result with `nodes` and `pageInfo` fields.
+</ParamField>
+
+<ParamField path="options" type="object">
+  Configuration options for the query.
+  
+  <Expandable title="properties">
+    <ParamField path="variables" type="Omit<TVariables, 'page'>">
+      Query variables (excluding the `page` parameter which is handled automatically).
+    </ParamField>
+    
+    <ParamField path="skip" type="boolean" default={false}>
+      If true, the query will not be executed.
+    </ParamField>
+    
+    <ParamField path="onResults" type="(results: TNodeChild[]) => void">
+      Callback function invoked after all pages have been loaded.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="results" type="TNodeChild[]">
+  Array of all items fetched from all pages.
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  True while pages are being fetched.
+</ResponseField>
+
+<ResponseField name="refetch" type="(variables?) => Promise<TNodeChild[]>">
+  Function to refetch all pages with optional new variables.
+</ResponseField>
+
+## Example
+
+```typescript
+import { usePaginatedLoadAll, graphql } from '@well-played.gg/react-sdk';
+
+const PLAYERS_QUERY = graphql(`
+  query players($ids: [ID!]!, $page: PageInfo!) {
+    players(ids: $ids, page: $page) {
+      nodes {
+        id
+        username
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+  }
+`);
+
+function PlayersList({ playerIds }: { playerIds: string[] }) {
+  const { results, loading, refetch } = usePaginatedLoadAll(
+    PLAYERS_QUERY,
+    {
+      variables: { ids: playerIds }
+    }
+  );
+
+  if (loading) return <div>Loading all players...</div>;
+
+  return (
+    <div>
+      <ul>
+        {results.map(player => (
+          <li key={player.id}>{player.username}</li>
+        ))}
+      </ul>
+      <button onClick={() => refetch()}>Refresh</button>
+    </div>
+  );
+}
+```
+
+## How It Works
+
+The hook automatically:
+1. Fetches the first page (100 items)
+2. Checks if there are more pages via `pageInfo.hasNextPage`
+3. Continues fetching subsequent pages using the `endCursor`
+4. Aggregates all results into a single array
+5. Calls `onResults` callback when complete
+
+## Performance Considerations
+
+<Warning>
+  Use this hook carefully with large datasets. It will fetch all pages sequentially, which can take significant time and bandwidth for large result sets.
+</Warning>
+
+For large datasets, consider:
+- Using [usePaginatedQuery](/api/hooks/use-paginated-query) for manual pagination
+- Implementing virtual scrolling with incremental loading
+- Adding filters to reduce the total result size
+
+## Error Handling
+
+The hook throws errors that occur during fetching. Wrap components using this hook with an Error Boundary:
+
+```typescript
+import { ErrorBoundary } from 'react-error-boundary';
+
+function SafePlayersList({ playerIds }: { playerIds: string[] }) {
+  return (
+    <ErrorBoundary fallback={<div>Failed to load players</div>}>
+      <PlayersList playerIds={playerIds} />
+    </ErrorBoundary>
+  );
+}
+```
+
+## Internal Usage
+
+This hook is used internally by:
+- [useTournamentTeams](/api/hooks/use-tournament-teams) - To fetch all teams in a tournament
+- [useTournamentStep](/api/hooks/use-tournament-step) - To fetch all match scores
+
+## See Also
+
+- [usePaginatedQuery](/api/hooks/use-paginated-query) - Manual pagination control
+- [Error Handling Guide](/guides/error-handling) - Pagination error patterns

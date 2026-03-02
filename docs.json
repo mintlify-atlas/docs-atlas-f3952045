@@ -77,7 +77,9 @@
               "api/hooks/use-players",
               "api/hooks/use-connected-player",
               "api/hooks/use-tournament-teams",
-              "api/hooks/use-tournament-step"
+              "api/hooks/use-tournament-step",
+              "api/hooks/use-paginated-query",
+              "api/hooks/use-paginated-load-all"
             ]
           },
           {

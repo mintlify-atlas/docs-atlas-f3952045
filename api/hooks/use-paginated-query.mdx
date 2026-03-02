@@ -1,0 +1,143 @@
+---
+title: usePaginatedQuery
+description: React hook for fetching paginated data with manual page loading
+---
+
+The `usePaginatedQuery` hook fetches paginated data from the WellPlayed API and provides methods to manually load additional pages.
+
+## Import
+
+```typescript
+import { usePaginatedQuery } from '@well-played.gg/react-sdk';
+```
+
+## Signature
+
+```typescript
+function usePaginatedQuery<TNodeChild, TData, TVariables>(
+  query: TypedDocumentNode<TData, TVariables> | TadaDocumentNode<TData, TVariables>,
+  options?: {
+    variables?: Omit<TVariables, "page">;
+    skip?: boolean;
+    onResults?: (results: TNodeChild[]) => void;
+    pageSize?: number;
+  }
+): {
+  data: TData | undefined;
+  loading: boolean;
+  loadNextPage: (variables?: Omit<TVariables, "page">) => Promise<void>;
+  loadNextPageWithoutAppendingOldData: (variables?: Omit<TVariables, "page">) => Promise<void>;
+}
+```
+
+Source: `paginated-query.hook.ts:17-84`
+
+## Parameters
+
+<ParamField path="query" type="TypedDocumentNode" required>
+  A GraphQL query created with the `graphql` tagged template. The query must return a paginated result with `nodes` and `pageInfo` fields.
+</ParamField>
+
+<ParamField path="options" type="object">
+  Configuration options for the query.
+  
+  <Expandable title="properties">
+    <ParamField path="variables" type="Omit<TVariables, 'page'>">
+      Query variables (excluding the `page` parameter which is handled automatically).
+    </ParamField>
+    
+    <ParamField path="skip" type="boolean" default={false}>
+      If true, the query will not be executed.
+    </ParamField>
+    
+    <ParamField path="onResults" type="(results: TNodeChild[]) => void">
+      Callback function invoked when results are loaded.
+    </ParamField>
+    
+    <ParamField path="pageSize" type="number" default={100}>
+      Number of items to fetch per page.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="data" type="TData | undefined">
+  The current page of query results.
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  True while the query is in flight.
+</ResponseField>
+
+<ResponseField name="loadNextPage" type="(variables?) => Promise<void>">
+  Loads the next page and refetches all data. Only loads if there is a next page available.
+</ResponseField>
+
+<ResponseField name="loadNextPageWithoutAppendingOldData" type="(variables?) => Promise<void>">
+  Loads the next page using `fetchMore`, which appends results to the existing data in the Apollo cache.
+</ResponseField>
+
+## Example
+
+```typescript
+import { usePaginatedQuery, graphql } from '@well-played.gg/react-sdk';
+
+const TEAMS_QUERY = graphql(`
+  query teams($tournamentId: ID!, $page: PageInfo!) {
+    tournamentTeams(tournamentId: $tournamentId, page: $page) {
+      nodes {
+        id
+        name
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+  }
+`);
+
+function TeamsList({ tournamentId }: { tournamentId: string }) {
+  const { data, loading, loadNextPage } = usePaginatedQuery(
+    TEAMS_QUERY,
+    {
+      variables: { tournamentId },
+      pageSize: 50
+    }
+  );
+
+  if (loading) return <div>Loading...</div>;
+
+  const teams = data?.tournamentTeams.nodes ?? [];
+  const hasMore = data?.tournamentTeams.pageInfo.hasNextPage ?? false;
+
+  return (
+    <div>
+      <ul>
+        {teams.map(team => (
+          <li key={team.id}>{team.name}</li>
+        ))}
+      </ul>
+      
+      {hasMore && (
+        <button onClick={() => loadNextPage()}>
+          Load More
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+## Notes
+
+- The hook automatically manages the `page` parameter with `first` and `after` cursors
+- Use `loadNextPage` for replacing all data with a fresh refetch
+- Use `loadNextPageWithoutAppendingOldData` to append pages in the Apollo cache
+- For automatic pagination that fetches all pages, use [usePaginatedLoadAll](/api/hooks/use-paginated-load-all)
+
+## See Also
+
+- [usePaginatedLoadAll](/api/hooks/use-paginated-load-all) - Automatically fetch all pages
+- [Error Handling](/guides/error-handling) - Handle pagination errors
