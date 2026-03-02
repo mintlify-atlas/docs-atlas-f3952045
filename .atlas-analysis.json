@@ -1,0 +1,105 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "WellPlayed React SDK",
+  "projectDescription": "Official React and TypeScript SDKs for integrating WellPlayed.gg gaming platform into your applications",
+  "theme": "palm",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#A78BFA",
+  "darkColor": "#6D28D9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "React SDK",
+            "pages": [
+              "react/installation",
+              "react/provider",
+              "react/authentication",
+              "react/components",
+              "react/hooks"
+            ]
+          },
+          {
+            "group": "TypeScript SDK",
+            "pages": [
+              "typescript/installation",
+              "typescript/client-setup",
+              "typescript/graphql-queries",
+              "typescript/typed-client"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/tournaments",
+              "guides/player-profiles",
+              "guides/teams",
+              "guides/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "React Components",
+            "pages": [
+              "api/components/wellplayed-provider",
+              "api/components/rich-text-editor-content"
+            ]
+          },
+          {
+            "group": "React Hooks",
+            "pages": [
+              "api/hooks/use-wellplayed",
+              "api/hooks/use-players",
+              "api/hooks/use-connected-player",
+              "api/hooks/use-tournament-teams",
+              "api/hooks/use-tournament-step"
+            ]
+          },
+          {
+            "group": "TypeScript Client",
+            "pages": [
+              "api/typescript/create-wellplayed-client",
+              "api/typescript/create-typed-client",
+              "api/typescript/graphql-operations"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "React Provider with OIDC authentication",
+    "Tournament and team management hooks",
+    "Player profile and identity management",
+    "GraphQL and typed client support",
+    "Rich text content rendering",
+    "WebSocket subscriptions for real-time updates"
+  ],
+  "publicApiSurface": [
+    "WellPlayedProvider",
+    "useWellPlayed",
+    "usePlayers",
+    "useConnectedPlayer",
+    "useTournamentTeams",
+    "useTournamentStep",
+    "RichTextEditorContent",
+    "createWellPlayedClient",
+    "createTypedClient",
+    "generateQueryOp",
+    "generateMutationOp",
+    "generateSubscriptionOp"
+  ]
+}
