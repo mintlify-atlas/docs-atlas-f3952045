@@ -1,0 +1,281 @@
+---
+title: createTypedClient
+description: Create a lightweight, type-safe GraphQL client with automatic request batching
+---
+
+## Overview
+
+The `createTypedClient` function creates a lightweight, type-safe GraphQL client using [Genql](https://genql.vercel.app/). It features automatic request batching, a simpler API surface than Apollo Client, and is ideal for server-side environments or lightweight client applications.
+
+Unlike `createWellPlayedClient`, this client:
+- ✅ Automatically batches requests for better performance
+- ✅ Provides a simple, type-safe query/mutation API
+- ✅ Has a smaller bundle size
+- ❌ Does not support GraphQL subscriptions
+- ❌ Does not include caching capabilities
+- ❌ Does not support Apollo-specific features
+
+## Function Signature
+
+```typescript
+export const createTypedClient = (
+  props: {
+    apiBaseUrl?: string;
+    organizationId: string;
+    token?: string;
+    application?: {
+      clientId: string;
+      clientSecret: string;
+    };
+  } & Omit<ClientOptions, 'url' | 'headers' | 'batch' | 'keepalive' | 'method'>
+) => TypedClient
+```
+
+Defined in `packages/typescript-sdk/src/typed-client.ts:6`
+
+## Parameters
+
+<ParamField path="organizationId" type="string" required>
+  The organization ID to use for all requests. This header is sent with every GraphQL operation as `organization-id`.
+</ParamField>
+
+<ParamField path="token" type="string">
+  The authentication token to use for the client. When provided, sent as `Bearer <token>` in the Authorization header.
+  
+  Mutually exclusive with `application` - use either user token OR application credentials, not both.
+</ParamField>
+
+<ParamField path="application" type="object">
+  Application credentials for server-side authentication. The client will automatically obtain and refresh access tokens using OAuth client credentials flow.
+  
+  <Expandable title="properties">
+    <ParamField path="clientId" type="string" required>
+      The application client ID from WellPlayed OAuth configuration.
+    </ParamField>
+    
+    <ParamField path="clientSecret" type="string" required>
+      The application client secret. Keep this secure and never expose it in client-side code.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="apiBaseUrl" type="string">
+  The base URL environment to connect to.
+  
+  **Examples:** `"well-played.gg"`, `"stg.well-played.gg"`
+  
+  **Default:** `"well-played.gg"`
+</ParamField>
+
+<ParamField path="...rest" type="RequestInit">
+  Additional [RequestInit](https://developer.mozilla.org/en-US/docs/Web/API/Request/Request#options) options to pass to the underlying fetch calls.
+  
+  Common options include:
+  - `credentials`: `"include"`, `"same-origin"`, or `"omit"`
+  - `mode`: `"cors"`, `"no-cors"`, or `"same-origin"`
+  - `cache`: Request cache mode
+  - `redirect`: Redirect handling
+  - `referrer`: Referrer URL
+  - `signal`: AbortSignal for request cancellation
+  
+  Note: The following options are managed internally and cannot be overridden: `url`, `headers`, `batch`, `keepalive`, `method`.
+</ParamField>
+
+## Return Value
+
+<ResponseField name="client" type="TypedClient">
+  A typed GraphQL client instance with the following methods:
+  
+  <Expandable title="methods">
+    <ResponseField name="query" type="<R>(request: R & { __name?: string }) => Promise<QueryResult<R>>">
+      Execute a type-safe GraphQL query. The request object structure is fully typed based on your GraphQL schema.
+      
+      The optional `__name` field sets the operation name for debugging and GraphQL tooling.
+    </ResponseField>
+    
+    <ResponseField name="mutation" type="<R>(request: R & { __name?: string }) => Promise<MutationResult<R>>">
+      Execute a type-safe GraphQL mutation. The request object structure is fully typed based on your GraphQL schema.
+      
+      The optional `__name` field sets the operation name for debugging and GraphQL tooling.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Request Batching
+
+The typed client automatically batches requests that occur within the same batch window. This is configured by default with:
+
+```typescript
+{
+  batchInterval: 100, // milliseconds
+  maxBatchSize: 10,   // maximum requests per batch
+}
+```
+
+**Batching behavior:**
+- Multiple queries/mutations initiated within 100ms are combined into a single HTTP request
+- Maximum 10 operations per batch
+- Each operation still receives its individual response
+- Reduces network overhead and improves performance
+
+Defined in `packages/typescript-sdk/src/typed-client.ts:22-25`
+
+## Examples
+
+### Basic Client
+
+```typescript
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createTypedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+});
+
+// Execute a typed query
+const result = await client.query({
+  __name: 'GetTournaments',
+  tournaments: {
+    __args: {
+      page: { first: 10 },
+    },
+    nodes: {
+      id: true,
+      name: true,
+      status: true,
+    },
+  },
+});
+
+console.log(result.tournaments.nodes);
+```
+
+### Server-Side with Application Auth
+
+```typescript
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createTypedClient({
+  organizationId: process.env.WELLPLAYED_ORG_ID,
+  application: {
+    clientId: process.env.WELLPLAYED_CLIENT_ID,
+    clientSecret: process.env.WELLPLAYED_CLIENT_SECRET,
+  },
+});
+
+// Execute a mutation
+const result = await client.mutation({
+  __name: 'CreateTournament',
+  tournamentCreate: {
+    __args: {
+      input: {
+        name: 'Summer Championship 2024',
+        game: 'fortnite',
+      },
+    },
+    id: true,
+    name: true,
+  },
+});
+```
+
+### Staging Environment
+
+```typescript
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createTypedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+  apiBaseUrl: 'stg.well-played.gg',
+});
+```
+
+### With Custom Fetch Options
+
+```typescript
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+
+const controller = new AbortController();
+
+const client = createTypedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+  credentials: 'include',
+  signal: controller.signal,
+});
+
+// Cancel all requests
+controller.abort();
+```
+
+### Automatic Request Batching Example
+
+```typescript
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createTypedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+});
+
+// These three requests will be automatically batched into a single HTTP request
+// because they occur within the 100ms batch interval
+const [tournaments, teams, players] = await Promise.all([
+  client.query({
+    tournaments: {
+      __args: { page: { first: 10 } },
+      nodes: { id: true, name: true },
+    },
+  }),
+  client.query({
+    teams: {
+      __args: { page: { first: 10 } },
+      nodes: { id: true, name: true },
+    },
+  }),
+  client.query({
+    players: {
+      __args: { page: { first: 10 } },
+      nodes: { id: true, username: true },
+    },
+  }),
+]);
+```
+
+## Implementation Details
+
+### API Endpoints
+
+The client constructs the GraphQL endpoint as:
+
+```
+https://api.warrior.{apiBaseUrl}/graphql
+```
+
+For OAuth (when using application auth):
+
+```
+https://oauth.warrior.{apiBaseUrl}
+```
+
+### Header Management
+
+Headers are set dynamically via an async function (defined in `typed-client.ts:26-42`):
+
+1. If `token` is provided, use it directly
+2. If `application` credentials are provided, obtain token via OAuth
+3. Set `organization-id` header
+4. Set `Authorization: Bearer <token>` if token is available
+
+### HTTP Configuration
+
+The client is configured with:
+- **Method:** `POST` (all GraphQL operations)
+- **Keepalive:** `true` (keeps connection alive for better performance)
+- **Content-Type:** `application/json`
+
+## Related
+
+- [createWellPlayedClient](/api/typescript/create-wellplayed-client) - Full-featured Apollo Client with subscriptions and caching
+- [GraphQL Operations](/api/typescript/graphql-operations) - Type-safe query construction using tagged templates

@@ -1,0 +1,80 @@
+---
+title: Installation
+description: Install and set up the WellPlayed React SDK in your application
+---
+
+## Install the Package
+
+Add the WellPlayed React SDK to your project using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install @well-played.gg/react-sdk
+```
+
+```bash yarn
+yarn add @well-played.gg/react-sdk
+```
+
+```bash pnpm
+pnpm add @well-played.gg/react-sdk
+```
+</CodeGroup>
+
+## Peer Dependencies
+
+The React SDK requires the following peer dependencies to be installed in your project:
+
+<CodeGroup>
+```json package.json
+{
+  "peerDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
+```
+</CodeGroup>
+
+<Note>
+Make sure you have React 19.0.0 or higher installed in your project. The SDK is built to work with modern React applications.
+</Note>
+
+## Key Dependencies
+
+The SDK includes the following key dependencies that power its functionality:
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key">
+    `@axa-fr/react-oidc` for OpenID Connect authentication
+  </Card>
+  <Card title="Rich Text" icon="text">
+    TipTap extensions for rich text content rendering
+  </Card>
+  <Card title="TypeScript SDK" icon="code">
+    `@well-played.gg/typescript-sdk` for API integration
+  </Card>
+  <Card title="Apollo Client" icon="globe">
+    GraphQL client for data fetching (included via TypeScript SDK)
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Get your credentials">
+    Obtain your App Client ID from the [WellPlayed Console](https://console.well-played.gg/apps)
+  </Step>
+  
+  <Step title="Configure the provider">
+    Set up the `WellPlayedProvider` in your application
+    
+    [Learn more about the provider →](/react/provider)
+  </Step>
+  
+  <Step title="Add authentication">
+    Implement OIDC authentication flow
+    
+    [Learn more about authentication →](/react/authentication)
+  </Step>
+</Steps>

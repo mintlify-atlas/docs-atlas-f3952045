@@ -1,0 +1,152 @@
+---
+title: WellPlayedProvider
+description: The root provider component that configures the WellPlayed SDK with authentication and API clients
+---
+
+## WellPlayedProvider
+
+The `WellPlayedProvider` component wraps your application to provide authentication, GraphQL client, and typed API client access throughout your React component tree.
+
+### Props
+
+<ParamField path="organizationId" type="string" required>
+  The organization ID from the [Well Played Console](https://console.well-played.gg).
+</ParamField>
+
+<ParamField path="wpAppConfig" type="object" required>
+  Application configurations from the [Well Played Console](https://console.well-played.gg/apps).
+  
+  <Expandable title="properties">
+    <ParamField path="client_id" type="string" required>
+      The client ID of the application.
+    </ParamField>
+    
+    <ParamField path="redirect_uri" type="string" required>
+      The redirect URI of the application (should be the same as the one configured on the Well Played Console).
+    </ParamField>
+    
+    <ParamField path="scope" type="string" required>
+      The scope of the application. If you want to refresh the token and maintain the session, you should add `offline_access`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="oidcConfig" type="object">
+  OIDC configurations. An object of type `Omit<OidcProviderProps, "configuration"> & { configuration: Omit<OidcConfiguration, "client_id" | "redirect_uri" | "scope" | "response_type" | "authority" | "authority_configuration" | "authority_timeout_wellknowurl_in_millisecond" | "authority_time_cache_wellknowurl_in_second"> }`.
+</ParamField>
+
+<ParamField path="clientConfig" type="object">
+  GraphQL client configurations. An object of type `Omit<ClientProps, "token" | "organizationId">`.
+</ParamField>
+
+<ParamField path="apiBaseUrl" type="ApiBaseUrl">
+  API Base URL for the WellPlayed API.
+</ParamField>
+
+<ParamField path="typedClientConfig" type="object">
+  Typed client configuration. An object of type `Omit<Parameters<typeof createTypedClient>[0], "url" | "headers" | "batch" | "keepalive" | "method">`.
+</ParamField>
+
+<ParamField path="children" type="React.ReactNode" required>
+  The child components to render within the provider.
+</ParamField>
+
+### Usage Example
+
+```tsx
+import { WellPlayedProvider } from '@wellplayed.gg/react-sdk';
+
+const App = () => {
+  return (
+    <WellPlayedProvider
+        organizationId="replace-with-yours" // Your Organization ID
+        wpAppConfig={{
+            scope: "offline_access", // Offline access to allow for refresh tokens
+            client_id: "replace-with-yours", // Your App Client ID
+            redirect_uri: `${
+                window.location.protocol
+            }//${window.location.origin}/login`, // The /login is required here (any path will work, but it needs a path or you'll get an error)
+        }}
+    >
+        <RouterProvider router={router} />
+    </WellPlayedProvider>
+  );
+};
+```
+
+### Type Definition
+
+```typescript
+type WPConfigProps = {
+  organizationId: string;
+  wpAppConfig: {
+    client_id: string;
+    redirect_uri: string;
+    scope: string;
+  };
+  oidcConfig?: Omit<OidcProviderProps, "configuration"> & {
+    configuration: Omit<
+      OidcConfiguration,
+      | "client_id"
+      | "redirect_uri"
+      | "scope"
+      | "response_type"
+      | "authority"
+      | "authority_configuration"
+      | "authority_timeout_wellknowurl_in_millisecond"
+      | "authority_time_cache_wellknowurl_in_second"
+    >;
+  };
+  clientConfig?: Omit<ClientProps, "token" | "organizationId">;
+  apiBaseUrl?: ApiBaseUrl;
+  typedClientConfig?: Omit<
+    Parameters<typeof createTypedClient>[0],
+    "url" | "headers" | "batch" | "keepalive" | "method"
+  >;
+};
+```
+
+---
+
+## useWellPlayed
+
+A hook that provides access to the WellPlayed context, including the organization ID, API clients, and access token.
+
+### Returns
+
+<ResponseField name="organizationId" type="string">
+  The organization ID configured in the provider.
+</ResponseField>
+
+<ResponseField name="apiClient" type="ApolloClient<NormalizedCacheObject>">
+  The Apollo GraphQL client configured for the WellPlayed API.
+</ResponseField>
+
+<ResponseField name="typedClient" type="ReturnType<typeof createTypedClient>">
+  The typed client for making type-safe API requests.
+</ResponseField>
+
+<ResponseField name="accessToken" type="string | undefined">
+  The current OIDC access token, if available.
+</ResponseField>
+
+### Usage Example
+
+```tsx
+import { useWellPlayed } from '@wellplayed.gg/react-sdk';
+
+const MyComponent = () => {
+  const { organizationId, apiClient, typedClient, accessToken } = useWellPlayed();
+  
+  // Use the clients to interact with the WellPlayed API
+  // ...
+};
+```
+
+### Error Handling
+
+This hook will throw an error if used outside of a `WellPlayedProvider`:
+
+```
+Error: useWellPlayed must be used within a WellPlayedProvider
+```

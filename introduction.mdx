@@ -1,0 +1,167 @@
+---
+title: Introduction
+description: Official React and TypeScript SDKs for integrating WellPlayed.gg gaming platform into your applications
+---
+
+## Welcome to WellPlayed SDK
+
+The WellPlayed SDK provides a comprehensive toolkit for integrating gaming tournament functionality into your applications. Built with TypeScript and React, it offers seamless authentication, real-time updates, and full access to the WellPlayed.gg platform.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running with WellPlayed in minutes
+  </Card>
+  <Card
+    title="React SDK"
+    icon="react"
+    href="/react/installation"
+  >
+    React components and hooks for tournament features
+  </Card>
+  <Card
+    title="TypeScript SDK"
+    icon="code"
+    href="/typescript/installation"
+  >
+    Type-safe GraphQL client for Node.js and browsers
+  </Card>
+  <Card
+    title="API Reference"
+    icon="book"
+    href="/api/hooks/use-wellplayed"
+  >
+    Complete API documentation and type definitions
+  </Card>
+</CardGroup>
+
+## What is WellPlayed.gg?
+
+WellPlayed.gg is a comprehensive gaming tournament platform that enables developers to build competitive gaming experiences. The platform provides:
+
+- **Tournament Management**: Create and manage tournaments with brackets, groups, and custom formats
+- **Player Profiles**: Unified player identity across multiple gaming platforms
+- **Team Management**: Organize teams, manage rosters, and handle team registrations
+- **Real-time Updates**: WebSocket subscriptions for live tournament data
+- **Rich Content**: Render tournament descriptions and announcements with rich text support
+
+## Key Features
+
+The WellPlayed SDK brings powerful features to your application:
+
+<AccordionGroup>
+  <Accordion title="React Provider with OIDC Authentication">
+    Built-in authentication flow using OpenID Connect. The `WellPlayedProvider` component handles the entire OAuth flow, token management, and automatic refresh.
+    
+    ```tsx
+    <WellPlayedProvider
+      organizationId="your-org-id"
+      wpAppConfig={{
+        client_id: "your-client-id",
+        redirect_uri: `${window.location.origin}/login`,
+        scope: "offline_access"
+      }}
+    >
+      <App />
+    </WellPlayedProvider>
+    ```
+  </Accordion>
+
+  <Accordion title="Tournament and Team Management Hooks">
+    Pre-built React hooks for common tournament operations:
+    - `useTournamentTeams` - Fetch and manage tournament teams by status
+    - `useTournamentStep` - Load complete tournament bracket data with scores
+    - Real-time data synchronization and automatic updates
+  </Accordion>
+
+  <Accordion title="Player Profile and Identity Management">
+    Unified player data across gaming platforms:
+    - `usePlayers` - Batch fetch player profiles with custom fields
+    - `useConnectedPlayer` - Access authenticated user's profile and permissions
+    - Multi-platform identity linking (Steam, Discord, etc.)
+  </Accordion>
+
+  <Accordion title="GraphQL and Typed Client Support">
+    Two powerful ways to interact with the API:
+    - **Apollo Client** - Full-featured GraphQL client with caching and subscriptions
+    - **Typed Client** - Type-safe batch queries with automatic code generation
+    
+    Both clients support:
+    - Automatic request batching
+    - Built-in authentication
+    - TypeScript type inference
+  </Accordion>
+
+  <Accordion title="Rich Text Content Rendering">
+    The `RichTextEditorContent` component safely renders user-generated HTML content from tournament descriptions, announcements, and player profiles using TipTap.
+  </Accordion>
+
+  <Accordion title="WebSocket Subscriptions for Real-time Updates">
+    Subscribe to live tournament events:
+    - Match score updates
+    - Team registration changes
+    - Tournament status transitions
+    - Player join/leave events
+  </Accordion>
+</AccordionGroup>
+
+## Architecture
+
+The WellPlayed SDK is split into two complementary packages:
+
+### React SDK (`@well-played.gg/react-sdk`)
+
+The React SDK provides:
+- `WellPlayedProvider` - Context provider with authentication
+- Pre-built hooks for tournaments, teams, and players
+- `RichTextEditorContent` component
+- Automatic Apollo Client configuration
+
+### TypeScript SDK (`@well-played.gg/typescript-sdk`)
+
+The TypeScript SDK provides:
+- `createWellPlayedClient` - Apollo Client factory with caching policies
+- `createTypedClient` - Type-safe GraphQL client with batching
+- `graphql` - Tagged template for type-safe queries
+- GraphQL operation generators (`generateQueryOp`, `generateMutationOp`, `generateSubscriptionOp`)
+
+<Note>
+  The React SDK depends on the TypeScript SDK and re-exports its core functionality. You can use the TypeScript SDK standalone in Node.js applications or non-React environments.
+</Note>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Tournament Websites" icon="trophy">
+    Build public-facing tournament websites with live brackets, team rosters, and player profiles
+  </Card>
+  <Card title="Gaming Communities" icon="users">
+    Create community platforms with integrated tournament features and player leaderboards
+  </Card>
+  <Card title="Esports Platforms" icon="gamepad">
+    Develop comprehensive esports platforms with multi-tournament support and team management
+  </Card>
+  <Card title="Game Integrations" icon="puzzle-piece">
+    Embed tournament functionality directly into your game client or companion app
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Get Started">
+    Follow the [Quickstart guide](/quickstart) to set up your first WellPlayed integration
+  </Step>
+  <Step title="Configure Authentication">
+    Create an application in the [WellPlayed Console](https://console.well-played.gg/apps) to get your credentials
+  </Step>
+  <Step title="Explore the API">
+    Browse the [API Reference](/api/hooks/use-wellplayed) to discover available hooks and components
+  </Step>
+  <Step title="Build Your Feature">
+    Check out the [Guides](/guides/tournaments) for common implementation patterns
+  </Step>
+</Steps>

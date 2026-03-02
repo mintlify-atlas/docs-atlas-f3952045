@@ -1,0 +1,502 @@
+---
+title: 'Error Handling'
+description: 'Learn how to handle errors effectively in the WellPlayed React SDK'
+---
+
+## Overview
+
+The WellPlayed React SDK uses Apollo Client for GraphQL operations and provides built-in error handling mechanisms. Understanding how to properly handle errors is crucial for building robust applications.
+
+## Error Policies
+
+The SDK configures different error policies for different operation types:
+
+### Query Error Policy
+
+```typescript
+query: {
+  fetchPolicy: 'network-only',
+  errorPolicy: 'all',
+}
+```
+
+Queries use the `all` error policy, which means:
+- Both data and errors are returned
+- Partial data is available even when errors occur
+- Your component receives both successful and failed results
+
+### Watch Query Error Policy
+
+```typescript
+watchQuery: {
+  fetchPolicy: 'network-only',
+  errorPolicy: 'ignore',
+}
+```
+
+Watch queries (subscriptions) use the `ignore` error policy:
+- Errors are silently ignored
+- Only successful data updates trigger re-renders
+- Useful for real-time updates where occasional failures are acceptable
+
+### Mutation Error Policy
+
+```typescript
+mutate: {
+  errorPolicy: 'all',
+}
+```
+
+Mutations use the `all` error policy for complete error visibility.
+
+<Info>
+  These error policies are configured in `packages/typescript-sdk/src/apollo.ts:162` when creating the Apollo Client.
+</Info>
+
+## Handling Errors in Hooks
+
+All WellPlayed hooks return a `loading` state but handle errors differently:
+
+### Paginated Query Errors
+
+The `usePaginatedLoadAll` hook throws errors that occurred during fetching:
+
+```tsx
+import { usePaginatedLoadAll } from '@well-played.gg/react-sdk';
+
+const MyComponent = () => {
+  const { loading, results, refetch } = usePaginatedLoadAll(
+    MY_QUERY,
+    {
+      variables: { id: '123' },
+    }
+  );
+
+  // Errors are thrown and can be caught by Error Boundaries
+  if (loading) return <div>Loading...</div>;
+  
+  return <div>{/* Render results */}</div>;
+};
+```
+
+Source reference: `packages/react-sdk/src/api/hooks/paginated-query.hook.ts:141`
+
+```typescript
+if (error) {
+  throw error;
+}
+```
+
+<Warning>
+  The `usePaginatedLoadAll` hook throws errors during pagination. Wrap components using this hook with an Error Boundary to catch and display errors gracefully.
+</Warning>
+
+### Player Query Errors
+
+The `usePlayers` hook handles errors silently and returns empty arrays:
+
+```tsx
+import { usePlayers } from '@well-played.gg/react-sdk';
+
+const PlayerList = ({ playerIds }: { playerIds: string[] }) => {
+  const { results, loading } = usePlayers({ playerIds });
+  
+  // If an error occurs, results will be an empty array
+  if (loading) return <div>Loading...</div>;
+  
+  if (results.length === 0) {
+    return <div>No players found or an error occurred</div>;
+  }
+  
+  return (
+    <div>
+      {results.map(player => (
+        <div key={player.id}>{player.username}</div>
+      ))}
+    </div>
+  );
+};
+```
+
+## Using Error Boundaries
+
+For hooks that throw errors, implement React Error Boundaries:
+
+```tsx
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback || (
+          <div>
+            <h2>Something went wrong</h2>
+            <p>{this.state.error?.message}</p>
+            <button onClick={() => this.setState({ hasError: false })}>
+              Try again
+            </button>
+          </div>
+        )
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default ErrorBoundary;
+```
+
+Use it to wrap components that might throw:
+
+```tsx
+<ErrorBoundary fallback={<div>Failed to load tournament data</div>}>
+  <TournamentStep tournamentId="123" stepId="456" />
+</ErrorBoundary>
+```
+
+## Custom Error Handlers
+
+You can provide custom error handlers when creating the WellPlayed client:
+
+```tsx
+import { WellPlayedProvider } from '@well-played.gg/react-sdk';
+import { onError } from '@apollo/client/link/error';
+
+function App() {
+  const errorHandler = onError(({ graphQLErrors, networkError, operation }) => {
+    if (graphQLErrors) {
+      graphQLErrors.forEach(({ message, locations, path }) => {
+        console.error(
+          `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
+        );
+      });
+    }
+
+    if (networkError) {
+      console.error(`[Network error]: ${networkError}`);
+    }
+  });
+
+  return (
+    <WellPlayedProvider
+      organizationId="your-org-id"
+      wpAppConfig={{
+        client_id: 'your-client-id',
+        redirect_uri: 'http://localhost:3000',
+        scope: 'openid profile',
+      }}
+      clientConfig={{
+        handlers: {
+          onError: errorHandler,
+        },
+      }}
+    >
+      {/* Your app */}
+    </WellPlayedProvider>
+  );
+}
+```
+
+<Note>
+  Error handlers are configured in the Apollo Client setup (source: `packages/typescript-sdk/src/apollo.ts:150`).
+</Note>
+
+## Network Error Handling
+
+Network errors occur when the API is unreachable:
+
+```tsx
+import { useQuery } from '@apollo/client';
+import { graphql } from '@well-played.gg/typescript-sdk';
+import { useWellPlayed } from '@well-played.gg/react-sdk';
+
+const MY_QUERY = graphql(`
+  query myQuery {
+    # your query
+  }
+`);
+
+const MyComponent = () => {
+  const { apiClient } = useWellPlayed();
+  const { data, loading, error } = useQuery(MY_QUERY, {
+    client: apiClient,
+  });
+
+  if (loading) return <div>Loading...</div>;
+  
+  if (error) {
+    if (error.networkError) {
+      return (
+        <div>
+          <h3>Network Error</h3>
+          <p>Unable to connect to the server. Please check your connection.</p>
+          <button onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+    
+    return <div>Error: {error.message}</div>;
+  }
+
+  return <div>{/* Render data */}</div>;
+};
+```
+
+## GraphQL Error Handling
+
+GraphQL errors occur when the query executes but the server returns errors:
+
+```tsx
+import { useQuery } from '@apollo/client';
+import { graphql } from '@well-played.gg/typescript-sdk';
+import { useWellPlayed } from '@well-played.gg/react-sdk';
+
+const MyComponent = () => {
+  const { apiClient } = useWellPlayed();
+  const { data, loading, error } = useQuery(MY_QUERY, {
+    client: apiClient,
+  });
+
+  if (loading) return <div>Loading...</div>;
+  
+  if (error?.graphQLErrors) {
+    return (
+      <div>
+        <h3>Query Errors</h3>
+        {error.graphQLErrors.map((err, index) => (
+          <div key={index}>
+            <p>Error: {err.message}</p>
+            {err.extensions?.code && (
+              <p>Code: {err.extensions.code}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <div>{/* Render data */}</div>;
+};
+```
+
+## Authentication Errors
+
+Handle authentication errors using the `useConnectedPlayer` hook:
+
+```tsx
+import { useConnectedPlayer } from '@well-played.gg/react-sdk';
+
+const ProtectedComponent = () => {
+  const { authenticated, loading, login, data } = useConnectedPlayer();
+
+  if (loading) {
+    return <div>Loading authentication...</div>;
+  }
+
+  if (!authenticated) {
+    return (
+      <div>
+        <h3>Authentication Required</h3>
+        <p>Please sign in to access this content.</p>
+        <button onClick={login}>Sign In</button>
+      </div>
+    );
+  }
+
+  if (!data?.getMyAccount) {
+    return (
+      <div>
+        <h3>Profile Error</h3>
+        <p>Unable to load your profile. Please try again.</p>
+      </div>
+    );
+  }
+
+  return <div>Welcome, {data.getMyAccount.profiles[0]?.username}!</div>;
+};
+```
+
+## Pagination Errors
+
+Handle errors in paginated queries:
+
+```tsx
+import { usePaginatedQuery } from '@well-played.gg/react-sdk';
+
+const PaginatedList = () => {
+  const { data, loading, loadNextPage } = usePaginatedQuery(
+    MY_PAGINATED_QUERY,
+    {
+      variables: { id: '123' },
+    }
+  );
+
+  const handleLoadMore = async () => {
+    try {
+      await loadNextPage();
+    } catch (error) {
+      console.error('Failed to load next page:', error);
+      alert('Failed to load more items. Please try again.');
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {/* Render items */}
+      <button onClick={handleLoadMore}>Load More</button>
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Error Boundaries for Critical Components">
+    Wrap components that fetch critical data with Error Boundaries:
+    
+    ```tsx
+    <ErrorBoundary fallback={<ErrorFallback />}>
+      <TournamentBracket />
+    </ErrorBoundary>
+    ```
+  </Accordion>
+  
+  <Accordion title="Provide Retry Mechanisms">
+    Always give users a way to retry failed operations:
+    
+    ```tsx
+    const { loading, refetch } = useQuery(MY_QUERY);
+    
+    if (error) {
+      return (
+        <div>
+          <p>Failed to load data</p>
+          <button onClick={() => refetch()}>Retry</button>
+        </div>
+      );
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Log Errors for Debugging">
+    Implement comprehensive error logging:
+    
+    ```tsx
+    const errorHandler = onError(({ graphQLErrors, networkError, operation }) => {
+      // Send to error tracking service
+      console.error('Operation:', operation.operationName);
+      console.error('GraphQL Errors:', graphQLErrors);
+      console.error('Network Error:', networkError);
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Partial Data">
+    With `errorPolicy: 'all'`, you can still use partial data:
+    
+    ```tsx
+    const { data, error } = useQuery(MY_QUERY);
+    
+    if (error) {
+      console.warn('Query had errors but may have partial data:', error);
+    }
+    
+    // Still render available data
+    return <div>{data ? renderData(data) : 'No data available'}</div>;
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate Data Before Rendering">
+    Always validate data exists before accessing nested properties:
+    
+    ```tsx
+    const { data, loading } = useQuery(MY_QUERY);
+    
+    if (loading) return <div>Loading...</div>;
+    
+    if (!data?.tournament?.steps) {
+      return <div>No tournament data available</div>;
+    }
+    
+    return <div>{/* Safe to render */}</div>;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## WebSocket Error Handling
+
+For real-time subscriptions, configure WebSocket error handlers:
+
+```tsx
+import { WellPlayedProvider } from '@well-played.gg/react-sdk';
+
+function App() {
+  return (
+    <WellPlayedProvider
+      organizationId="your-org-id"
+      wpAppConfig={{
+        client_id: 'your-client-id',
+        redirect_uri: 'http://localhost:3000',
+        scope: 'openid profile',
+      }}
+      clientConfig={{
+        handlers: {
+          webSocket: {
+            onError: (error) => {
+              console.error('WebSocket error:', error);
+            },
+            onClosed: (event) => {
+              console.log('WebSocket closed:', event);
+            },
+            onConnected: () => {
+              console.log('WebSocket connected');
+            },
+          },
+        },
+      }}
+    >
+      {/* Your app */}
+    </WellPlayedProvider>
+  );
+}
+```
+
+<Tip>
+  WebSocket handlers are configured when creating the Apollo Client (source: `packages/typescript-sdk/src/apollo.ts:49`).
+</Tip>
+
+## Related Topics
+
+- [useTournamentStep](/guides/tournaments) - Tournament data fetching
+- [usePlayers](/guides/player-profiles) - Player profile queries
+- [useTournamentTeams](/guides/teams) - Team data management

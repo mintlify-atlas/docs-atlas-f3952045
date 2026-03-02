@@ -1,0 +1,462 @@
+---
+title: Typed Client
+description: Use the lightweight typed client for server-side GraphQL operations
+---
+
+The typed client provides a lightweight alternative to Apollo Client, ideal for server-side environments, serverless functions, and scripts.
+
+## When to Use the Typed Client
+
+<CardGroup cols={2}>
+  <Card title="Use Typed Client" icon="check" color="#10b981">
+    - Server-side rendering
+    - Serverless functions
+    - CLI tools and scripts
+    - Simple query/mutation operations
+    - When you don't need caching
+  </Card>
+  <Card title="Use Apollo Client" icon="xmark" color="#ef4444">
+    - Browser applications
+    - React applications
+    - When you need caching
+    - When you need subscriptions
+    - Complex state management
+  </Card>
+</CardGroup>
+
+## Basic Usage
+
+```typescript
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createTypedClient({
+  organizationId: 'your-org-id',
+  token: 'your-auth-token'
+});
+
+// Make a query
+const result = await client.query({
+  players: {
+    __args: {
+      ids: ['player-1'],
+      page: { first: 10 }
+    },
+    nodes: {
+      id: true,
+      username: true,
+      customFields: {
+        property: true,
+        value: true
+      }
+    }
+  }
+});
+
+console.log(result.players.nodes);
+```
+
+## Type Signature
+
+From `typed-client.ts:6-48`:
+
+```typescript
+export const createTypedClient = (
+  props: {
+    apiBaseUrl?: string;
+    organizationId: string;
+    token?: string;
+    application?: {
+      clientId: string;
+      clientSecret: string;
+    };
+  } & Omit<ClientOptions, "url" | "headers" | "batch" | "keepalive" | "method">,
+) => {
+  const apiBaseUrl = props.apiBaseUrl ?? "well-played.gg";
+  const url = `https://api.warrior.${apiBaseUrl}/graphql`;
+  const oauthUrl = `https://oauth.warrior.${apiBaseUrl}`;
+  return createClient({
+    url,
+    batch: {
+      batchInterval: 100,
+      maxBatchSize: 10,
+    },
+    headers: async () => {
+      const token =
+        props.token ??
+        (props.application
+          ? await getToken(
+              props.application.clientId,
+              props.application.clientSecret,
+              oauthUrl,
+            )
+          : undefined);
+      return omitBy(
+        {
+          "organization-id": props.organizationId,
+          authorization: token ? `Bearer ${token}` : undefined,
+        },
+        isNil,
+      ) as Record<string, string>;
+    },
+    keepalive: true,
+    method: "POST",
+    ...omit(props, "apiBaseUrl", "application", "token", "organizationId"),
+  });
+};
+
+export type TypedClient = ReturnType<typeof createTypedClient>;
+```
+
+## Configuration Options
+
+### User Authentication
+
+Authenticate as a user with a JWT token:
+
+```typescript
+const client = createTypedClient({
+  organizationId: 'your-org-id',
+  token: 'user-jwt-token'
+});
+```
+
+### Application Authentication
+
+Authenticate as an application using client credentials:
+
+```typescript
+const client = createTypedClient({
+  organizationId: 'your-org-id',
+  application: {
+    clientId: process.env.WP_CLIENT_ID!,
+    clientSecret: process.env.WP_CLIENT_SECRET!
+  }
+});
+```
+
+<Note>
+Application authentication automatically handles OAuth token refresh and caching.
+</Note>
+
+### Environment Configuration
+
+```typescript
+const client = createTypedClient({
+  organizationId: 'your-org-id',
+  apiBaseUrl: 'stg.well-played.gg', // default: 'well-played.gg'
+  application: { /* ... */ }
+});
+```
+
+## Request Batching
+
+The typed client automatically batches multiple queries executed within 100ms:
+
+```typescript
+const client = createTypedClient({
+  organizationId: 'your-org-id',
+  token: 'your-token'
+});
+
+// These queries will be batched into a single HTTP request
+const [players, tournaments] = await Promise.all([
+  client.query({
+    players: {
+      __args: { ids: ['p1'], page: { first: 10 } },
+      nodes: { id: true, username: true }
+    }
+  }),
+  client.query({
+    tournaments: {
+      __args: { page: { first: 10 } },
+      nodes: { id: true, name: true }
+    }
+  })
+]);
+```
+
+Batching configuration from `typed-client.ts:22-25`:
+
+```typescript
+batch: {
+  batchInterval: 100,  // Wait 100ms before sending batch
+  maxBatchSize: 10,    // Max 10 queries per batch
+}
+```
+
+## Making Queries
+
+### Basic Query
+
+```typescript
+const result = await client.query({
+  tournaments: {
+    __args: {
+      page: { first: 20 },
+      status: 'PUBLISHED'
+    },
+    nodes: {
+      id: true,
+      name: true,
+      startDate: true,
+      status: true
+    },
+    pageInfo: {
+      hasNextPage: true,
+      endCursor: true
+    }
+  }
+});
+
+console.log(result.tournaments.nodes);
+```
+
+### Nested Queries
+
+```typescript
+const result = await client.query({
+  tournament: {
+    __args: { id: 'tournament-1' },
+    id: true,
+    name: true,
+    steps: {
+      id: true,
+      name: true,
+      type: true,
+      groups: {
+        id: true,
+        name: true,
+        teams: {
+          id: true,
+          name: true
+        }
+      }
+    }
+  }
+});
+```
+
+### Query with Variables
+
+```typescript
+const getTournamentTeams = async (tournamentId: string) => {
+  return client.query({
+    tournamentTeams: {
+      __args: {
+        tournamentId,
+        page: { first: 100 },
+        memberStatus: 'ACCEPTED',
+        status: 'CONFIRMED'
+      },
+      nodes: {
+        id: true,
+        name: true,
+        members: {
+          playerProfileId: true,
+          status: true
+        }
+      },
+      pageInfo: {
+        hasNextPage: true,
+        endCursor: true
+      }
+    }
+  });
+};
+```
+
+## Making Mutations
+
+```typescript
+const result = await client.mutation({
+  createTournament: {
+    __args: {
+      input: {
+        name: 'My Tournament',
+        startDate: '2024-01-01T00:00:00Z',
+        status: 'DRAFT'
+      }
+    },
+    id: true,
+    name: true,
+    status: true
+  }
+});
+
+console.log('Created tournament:', result.createTournament.id);
+```
+
+## Pagination Helper
+
+```typescript
+async function getAllPlayers(playerIds: string[]) {
+  const result: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | undefined;
+
+  while (hasNextPage) {
+    const response = await client.query({
+      players: {
+        __args: {
+          ids: playerIds,
+          page: cursor 
+            ? { first: 100, after: cursor } 
+            : { first: 100 }
+        },
+        nodes: {
+          id: true,
+          username: true,
+          customFields: {
+            property: true,
+            value: true
+          }
+        },
+        pageInfo: {
+          hasNextPage: true,
+          endCursor: true
+        }
+      }
+    });
+
+    result.push(...response.players.nodes);
+    hasNextPage = response.players.pageInfo.hasNextPage;
+    cursor = response.players.pageInfo.endCursor;
+  }
+
+  return result;
+}
+```
+
+## Server-Side Example (Next.js)
+
+```typescript
+// app/api/tournaments/route.ts
+import { createTypedClient } from '@well-played.gg/typescript-sdk';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  const client = createTypedClient({
+    organizationId: process.env.WP_ORG_ID!,
+    application: {
+      clientId: process.env.WP_CLIENT_ID!,
+      clientSecret: process.env.WP_CLIENT_SECRET!
+    }
+  });
+
+  const result = await client.query({
+    tournaments: {
+      __args: {
+        page: { first: 20 },
+        status: 'PUBLISHED'
+      },
+      nodes: {
+        id: true,
+        name: true,
+        startDate: true
+      }
+    }
+  });
+
+  return NextResponse.json(result.tournaments.nodes);
+}
+```
+
+## Error Handling
+
+```typescript
+import { GenqlError } from '@well-played.gg/typescript-sdk';
+
+try {
+  const result = await client.query({
+    tournament: {
+      __args: { id: 'invalid-id' },
+      id: true,
+      name: true
+    }
+  });
+} catch (error) {
+  if (error instanceof GenqlError) {
+    console.error('GraphQL Error:', error.message);
+    console.error('Errors:', error.errors);
+  } else {
+    console.error('Network Error:', error);
+  }
+}
+```
+
+## TypeScript Type Safety
+
+The typed client provides full TypeScript autocomplete:
+
+```typescript
+const result = await client.query({
+  tournaments: {
+    __args: {
+      page: { first: 10 }
+    },
+    nodes: {
+      id: true,
+      name: true,
+      // TypeScript will autocomplete available fields
+      // and validate field selections
+    }
+  }
+});
+
+// Result is fully typed:
+result.tournaments.nodes // Array<{ id: string; name: string }>
+```
+
+## Comparison with Apollo Client
+
+<Tabs>
+  <Tab title="Typed Client">
+    ```typescript
+    const client = createTypedClient({
+      organizationId: 'org-id',
+      token: 'token'
+    });
+
+    const result = await client.query({
+      players: {
+        __args: {
+          ids: ['p1'],
+          page: { first: 10 }
+        },
+        nodes: {
+          id: true,
+          username: true
+        }
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="Apollo Client">
+    ```typescript
+    import { graphql } from '@well-played.gg/typescript-sdk';
+    import { useQuery } from '@apollo/client';
+
+    const GET_PLAYERS = graphql(`
+      query getPlayers($ids: [ID!]!, $page: PageInfo!) {
+        players(ids: $ids, page: $page) {
+          nodes {
+            id
+            username
+          }
+        }
+      }
+    `);
+
+    const { data } = useQuery(GET_PLAYERS, {
+      variables: {
+        ids: ['p1'],
+        page: { first: 10 }
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+The typed client does not support GraphQL subscriptions. Use Apollo Client with WebSocket configuration for real-time updates.
+</Warning>

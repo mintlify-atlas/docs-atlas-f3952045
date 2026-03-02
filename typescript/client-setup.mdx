@@ -1,0 +1,287 @@
+---
+title: Client Setup
+description: Configure the WellPlayed Apollo client with authentication, caching, and WebSocket support
+---
+
+The `createWellPlayedClient` function creates a fully configured Apollo Client with WellPlayed-specific features.
+
+## Basic Usage
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  token: 'your-auth-token'
+});
+```
+
+## Configuration Options
+
+The client accepts a `ClientProps` configuration object with the following options:
+
+### ClientProps Type
+
+From `apollo.ts:29-78`:
+
+```typescript
+type ClientProps = {
+  /**
+   * The authentication token to use for the client.
+   */
+  token?: string;
+  /**
+   * The organization ID to use for the client.
+   */
+  organizationId: string;
+  /**
+   * The invalidation policies to use for the client.
+   */
+  invalidationPolicies?: InvalidationPolicies;
+  /**
+   * The fetch policy to use for the client.
+   */
+  fetchPolicy?: FetchPolicy;
+  /**
+   * The handlers to use for the client.
+   */
+  handlers?: {
+    onError?: ErrorHandler;
+    webSocket?: {
+      onConnected?: EventConnectedListener;
+      onClosed?: EventClosedListener;
+      onError?: EventErrorListener;
+    };
+  };
+  /**
+   * The websocket options to use for the client.
+   */
+  websocket?: {
+    lazy?: boolean;
+  };
+  /**
+   * The base URL to use for the client.
+   */
+  apiBaseUrl?: ApiBaseUrl;
+  /**
+   * Whether the client is running in Server mode.
+   */
+  ssr?: boolean;
+  /**
+   * The application to use for the client. Only used when running in Server mode as an application (authenticate as the application).
+   */
+  application?: {
+    clientId: string;
+    clientSecret: string;
+  };
+};
+```
+
+## Authentication
+
+<Steps>
+  <Step title="User Authentication">
+    Use the `token` parameter to authenticate as a user:
+
+    ```typescript
+    const client = createWellPlayedClient({
+      organizationId: 'your-org-id',
+      token: 'user-jwt-token'
+    });
+    ```
+  </Step>
+
+  <Step title="Application Authentication">
+    For server-side usage, authenticate as an application using client credentials:
+
+    ```typescript
+    const client = createWellPlayedClient({
+      organizationId: 'your-org-id',
+      ssr: true,
+      application: {
+        clientId: 'your-client-id',
+        clientSecret: 'your-client-secret'
+      }
+    });
+    ```
+
+    <Note>
+    Application authentication automatically handles OAuth token refresh.
+    </Note>
+  </Step>
+</Steps>
+
+## Cache Invalidation Policies
+
+The client uses `@nerdwallet/apollo-cache-policies` for advanced cache management:
+
+```typescript
+import { RenewalPolicy } from '@nerdwallet/apollo-cache-policies';
+
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  invalidationPolicies: {
+    timeToLive: 300000, // 5 minutes (default: 120000)
+    renewalPolicy: RenewalPolicy.WriteOnly, // default: RenewalPolicy.None
+    types: {
+      Tournament: {
+        timeToLive: 600000 // Custom TTL for Tournament type
+      }
+    }
+  }
+});
+```
+
+<Note>
+The cache is automatically persisted to localStorage for offline support (disabled in SSR mode).
+</Note>
+
+## Fetch Policy
+
+Control how queries fetch data:
+
+```typescript
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  fetchPolicy: 'cache-first' // default: 'network-only'
+});
+```
+
+Available policies:
+- `cache-first` - Use cache if available, otherwise fetch from network
+- `cache-and-network` - Use cache and fetch from network, updating cache
+- `network-only` - Always fetch from network (default)
+- `no-cache` - Fetch from network without caching
+- `cache-only` - Only use cache, never fetch from network
+
+## WebSocket Configuration
+
+Enable GraphQL subscriptions with WebSocket support:
+
+```typescript
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  websocket: {
+    lazy: true // Only connect when first subscription is made
+  },
+  handlers: {
+    webSocket: {
+      onConnected: (socket) => {
+        console.log('WebSocket connected');
+      },
+      onClosed: (event) => {
+        console.log('WebSocket closed:', event);
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error);
+      }
+    }
+  }
+});
+```
+
+## Error Handling
+
+Handle GraphQL and network errors globally:
+
+```typescript
+import { onError } from '@apollo/client/link/error';
+
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  handlers: {
+    onError: ({ graphQLErrors, networkError }) => {
+      if (graphQLErrors) {
+        graphQLErrors.forEach(({ message, locations, path }) => {
+          console.error(
+            `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
+          );
+        });
+      }
+      if (networkError) {
+        console.error(`[Network error]: ${networkError}`);
+      }
+    }
+  }
+});
+```
+
+## Environment Configuration
+
+Switch between production and staging environments:
+
+```typescript
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  apiBaseUrl: 'stg.well-played.gg' // default: 'well-played.gg'
+});
+```
+
+<CodeGroup>
+```typescript Production
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  apiBaseUrl: 'well-played.gg'
+});
+// Uses: https://api.warrior.well-played.gg/graphql
+```
+
+```typescript Staging
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  apiBaseUrl: 'stg.well-played.gg'
+});
+// Uses: https://api.warrior.stg.well-played.gg/graphql
+```
+</CodeGroup>
+
+## Server-Side Rendering
+
+Configure the client for SSR frameworks like Next.js:
+
+```typescript
+const client = createWellPlayedClient({
+  organizationId: 'your-org-id',
+  ssr: true, // Disables cache persistence and enables SSR mode
+  application: {
+    clientId: process.env.WP_CLIENT_ID!,
+    clientSecret: process.env.WP_CLIENT_SECRET!
+  }
+});
+```
+
+<Warning>
+In SSR mode, cache persistence to localStorage is automatically disabled.
+</Warning>
+
+## Complete Example
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+import { RenewalPolicy } from '@nerdwallet/apollo-cache-policies';
+
+const client = createWellPlayedClient({
+  organizationId: process.env.NEXT_PUBLIC_WP_ORG_ID!,
+  token: getUserToken(),
+  apiBaseUrl: 'well-played.gg',
+  fetchPolicy: 'cache-first',
+  invalidationPolicies: {
+    timeToLive: 300000,
+    renewalPolicy: RenewalPolicy.WriteOnly,
+  },
+  websocket: {
+    lazy: true
+  },
+  handlers: {
+    onError: ({ graphQLErrors, networkError }) => {
+      // Handle errors
+    },
+    webSocket: {
+      onConnected: () => console.log('Connected'),
+      onError: (err) => console.error('WS Error:', err)
+    }
+  }
+});
+
+export default client;
+```

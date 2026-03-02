@@ -1,0 +1,291 @@
+---
+title: createWellPlayedClient
+description: Create a full-featured Apollo Client instance configured for the WellPlayed GraphQL API
+---
+
+## Overview
+
+The `createWellPlayedClient` function creates a fully configured [Apollo Client](https://www.apollographql.com/docs/react/) instance for the WellPlayed GraphQL API. It supports queries, mutations, subscriptions (via WebSockets), SSR, application authentication, and advanced caching.
+
+This client is ideal for React applications using Apollo hooks or any JavaScript environment requiring advanced GraphQL features.
+
+## Function Signature
+
+```typescript
+export const createWellPlayedClient = ({
+  token,
+  organizationId,
+  invalidationPolicies,
+  handlers,
+  fetchPolicy,
+  websocket,
+  apiBaseUrl,
+  ssr,
+  application,
+}: ClientProps) => ApolloClient
+```
+
+Defined in `packages/typescript-sdk/src/apollo.ts:80`
+
+## Parameters
+
+<ParamField path="organizationId" type="string" required>
+  The organization ID to use for all requests. This header is sent with every GraphQL operation.
+</ParamField>
+
+<ParamField path="token" type="string">
+  The authentication token to use for the client. When provided, sent as `Bearer <token>` in the Authorization header.
+  
+  Mutually exclusive with `application` - use either user token OR application credentials, not both.
+</ParamField>
+
+<ParamField path="application" type="object">
+  Application credentials for server-side authentication. The client will automatically obtain and refresh access tokens using OAuth client credentials flow.
+  
+  <Expandable title="properties">
+    <ParamField path="clientId" type="string" required>
+      The application client ID from WellPlayed OAuth configuration.
+    </ParamField>
+    
+    <ParamField path="clientSecret" type="string" required>
+      The application client secret. Keep this secure and never expose it in client-side code.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="apiBaseUrl" type="ApiBaseUrl">
+  The base URL environment to connect to.
+  
+  **Type:** `"well-played.gg" | "stg.well-played.gg"`
+  
+  **Default:** `"well-played.gg"`
+</ParamField>
+
+<ParamField path="ssr" type="boolean">
+  Whether the client is running in Server-Side Rendering mode. When `true`:
+  - Disables local storage cache persistence
+  - Sets Apollo's `ssrMode` option
+  - Default: `false`
+</ParamField>
+
+<ParamField path="fetchPolicy" type="FetchPolicy">
+  The default fetch policy for queries and watch queries.
+  
+  **Type:** Apollo's `FetchPolicy` (`"cache-first" | "cache-and-network" | "network-only" | "cache-only" | "no-cache" | "standby"`)
+  
+  **Default:** `"network-only"`
+</ParamField>
+
+<ParamField path="invalidationPolicies" type="InvalidationPolicies">
+  Custom cache invalidation policies using [@nerdwallet/apollo-cache-policies](https://github.com/NerdWalletOSS/apollo-cache-policies).
+  
+  <Expandable title="properties">
+    <ParamField path="timeToLive" type="number">
+      Time in milliseconds before cached data is considered stale.
+      
+      **Default:** `120000` (2 minutes)
+    </ParamField>
+    
+    <ParamField path="renewalPolicy" type="RenewalPolicy">
+      Policy for renewing cached data.
+      
+      **Default:** `RenewalPolicy.None`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="websocket" type="object">
+  WebSocket configuration for GraphQL subscriptions.
+  
+  <Expandable title="properties">
+    <ParamField path="lazy" type="boolean">
+      If `true`, the WebSocket connection is only established when the first subscription is created. If `false`, the connection is established immediately.
+      
+      **Default:** `false`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="handlers" type="object">
+  Event handlers for errors and WebSocket lifecycle events.
+  
+  <Expandable title="properties">
+    <ParamField path="onError" type="ErrorHandler">
+      Apollo error handler function. Called when GraphQL errors or network errors occur.
+      
+      **Type:** `(errorResponse: ErrorResponse) => void`
+    </ParamField>
+    
+    <ParamField path="webSocket" type="object">
+      WebSocket event listeners.
+      
+      <Expandable title="properties">
+        <ParamField path="onConnected" type="EventConnectedListener">
+          Called when the WebSocket connection is established.
+          
+          **Type:** `(socket: WebSocket, payload?: Record<string, unknown>) => void`
+        </ParamField>
+        
+        <ParamField path="onClosed" type="EventClosedListener">
+          Called when the WebSocket connection is closed.
+          
+          **Type:** `(event: CloseEvent) => void`
+        </ParamField>
+        
+        <ParamField path="onError" type="EventErrorListener">
+          Called when a WebSocket error occurs.
+          
+          **Type:** `(error: Error) => void`
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="client" type="ApolloClient">
+  A configured Apollo Client instance ready to execute GraphQL operations. The client includes:
+  - HTTP link for queries and mutations
+  - WebSocket link for subscriptions (automatically selected based on operation type)
+  - Cache with invalidation policies
+  - Default error policies and fetch policies
+</ResponseField>
+
+## Examples
+
+### Basic Client (Browser)
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createWellPlayedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+});
+```
+
+### SSR Configuration (Next.js)
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createWellPlayedClient({
+  organizationId: 'org_123456',
+  token: userToken, // from session/cookie
+  ssr: true, // Disables localStorage persistence
+  fetchPolicy: 'network-only',
+});
+```
+
+### Application Authentication (Server)
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createWellPlayedClient({
+  organizationId: 'org_123456',
+  application: {
+    clientId: process.env.WELLPLAYED_CLIENT_ID,
+    clientSecret: process.env.WELLPLAYED_CLIENT_SECRET,
+  },
+  ssr: true,
+});
+```
+
+### With WebSocket Subscriptions
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createWellPlayedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+  websocket: {
+    lazy: true, // Connect only when subscription starts
+  },
+  handlers: {
+    webSocket: {
+      onConnected: (socket) => {
+        console.log('WebSocket connected');
+      },
+      onClosed: (event) => {
+        console.log('WebSocket closed:', event.code);
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error);
+      },
+    },
+  },
+});
+```
+
+### With Error Handling and Cache Configuration
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+import { RenewalPolicy } from '@nerdwallet/apollo-cache-policies';
+
+const client = createWellPlayedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+  fetchPolicy: 'cache-and-network',
+  invalidationPolicies: {
+    timeToLive: 300000, // 5 minutes
+    renewalPolicy: RenewalPolicy.WriteOnly,
+  },
+  handlers: {
+    onError: ({ graphQLErrors, networkError }) => {
+      if (graphQLErrors) {
+        graphQLErrors.forEach(({ message, locations, path }) =>
+          console.error(
+            `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
+          )
+        );
+      }
+      if (networkError) {
+        console.error(`[Network error]: ${networkError}`);
+      }
+    },
+  },
+});
+```
+
+### Staging Environment
+
+```typescript
+import { createWellPlayedClient } from '@well-played.gg/typescript-sdk';
+
+const client = createWellPlayedClient({
+  organizationId: 'org_123456',
+  token: 'user-jwt-token',
+  apiBaseUrl: 'stg.well-played.gg',
+});
+```
+
+## Implementation Details
+
+### API Endpoints
+
+The client constructs the following URLs based on `apiBaseUrl`:
+
+- **GraphQL HTTP:** `https://api.warrior.{apiBaseUrl}/graphql`
+- **GraphQL WebSocket:** `wss://api.warrior.{apiBaseUrl}/graphql`
+- **OAuth:** `https://oauth.warrior.{apiBaseUrl}`
+
+### Cache Persistence
+
+When `ssr: false` (default), the client uses `apollo3-cache-persist` to synchronously persist the cache to `localStorage`. This provides offline-first capabilities and faster subsequent page loads.
+
+### Operation Routing
+
+The client uses Apollo's `split` to route operations:
+- **Subscriptions** → WebSocket link
+- **Queries & Mutations** → HTTP link
+
+Routing is determined automatically based on the operation type in your GraphQL document.
+
+## Related
+
+- [createTypedClient](/api/typescript/create-typed-client) - Lightweight typed client with automatic batching
+- [GraphQL Operations](/api/typescript/graphql-operations) - Type-safe query construction

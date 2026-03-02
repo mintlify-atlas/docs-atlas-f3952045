@@ -1,0 +1,394 @@
+---
+title: Hooks
+description: React hooks for interacting with the WellPlayed API
+---
+
+## Overview
+
+The WellPlayed React SDK provides a set of hooks for fetching and managing data from the WellPlayed API. All hooks automatically handle authentication, pagination, and caching.
+
+<Note>
+  All hooks must be used within a component wrapped by `WellPlayedProvider`.
+</Note>
+
+## Available Hooks
+
+### useConnectedPlayer
+
+Retrieve the current authenticated player's profile, permissions, and identities.
+
+```tsx
+import { useConnectedPlayer } from '@well-played.gg/react-sdk';
+
+const { data, loading, authenticated, login, logout, refetch } = useConnectedPlayer();
+```
+
+<Card title="Learn More" icon="book" href="/react/authentication">
+  See the Authentication page for detailed usage and examples
+</Card>
+
+### usePlayers
+
+Retrieve player profiles from a list of player IDs with automatic pagination.
+
+```tsx
+import { usePlayers } from '@well-played.gg/react-sdk';
+
+const PlayerList = ({ playerIds }: { playerIds: string[] }) => {
+  const { results, loading, refetch } = usePlayers({
+    playerIds,
+    skip: false,
+  });
+
+  if (loading) return <div>Loading players...</div>;
+
+  return (
+    <ul>
+      {results.map(player => (
+        <li key={player.id}>
+          {player.username} (ID: {player.id})
+        </li>
+      ))}
+    </ul>
+  );
+};
+```
+
+#### Parameters
+
+<ParamField path="playerIds" type="string[]">
+  Array of player profile IDs to fetch.
+</ParamField>
+
+<ParamField path="skip" type="boolean">
+  Skip the query if true. Useful for conditional fetching.
+</ParamField>
+
+#### Return Values
+
+<ResponseField name="results" type="Player[]">
+  Array of player profile objects.
+  
+  ```typescript
+  {
+    id: string;
+    username: string;
+    ownerId: string;
+    customFields: Array<{
+      property: string;
+      value: string;
+    }>;
+    identities: Array<{
+      providerId: string;
+      properties: Array<{
+        property: string;
+        value: string;
+      }>;
+    }>;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Whether the data is currently being fetched.
+</ResponseField>
+
+<ResponseField name="refetch" type="(playerIds: string[]) => Promise<void>">
+  Function to refetch players with new IDs.
+</ResponseField>
+
+### useTournamentTeams
+
+Retrieve the list of teams for a specific tournament, filtered by status.
+
+```tsx
+import { useTournamentTeams } from '@well-played.gg/react-sdk';
+
+const TournamentTeams = ({ tournamentId }: { tournamentId: string }) => {
+  const { results, loading } = useTournamentTeams({
+    tournamentId,
+    status: 'CONFIRMED',
+    skip: false,
+  });
+
+  if (loading) return <div>Loading teams...</div>;
+
+  return (
+    <div>
+      <h2>Teams ({results.length})</h2>
+      {results.map(team => (
+        <div key={team.id}>
+          <h3>{team.name}</h3>
+          <ul>
+            {team.members.map(member => (
+              <li key={member.playerProfileId}>
+                {member.player.username} ({member.status})
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+#### Parameters
+
+<ParamField path="tournamentId" type="string" required>
+  The ID of the tournament.
+</ParamField>
+
+<ParamField path="status" type="TournamentTeamStatus">
+  Filter teams by status (e.g., `"CONFIRMED"`, `"PENDING"`).
+</ParamField>
+
+<ParamField path="skip" type="boolean">
+  Skip the query if true.
+</ParamField>
+
+#### Return Values
+
+<ResponseField name="results" type="Team[]">
+  Array of team objects with populated player data.
+  
+  ```typescript
+  {
+    id: string;
+    name: string;
+    status: string;
+    members: Array<{
+      status: string;
+      playerProfileId: string;
+      player: {
+        id: string;
+        username: string;
+        customFields: Array<{...}>;
+        identities: Array<{...}>;
+      };
+    }>;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Whether the data is currently being fetched.
+</ResponseField>
+
+### useTournamentStep
+
+Retrieve all the data needed to reconstruct a tournament step, including groups, rounds, games, matches, and scores.
+
+```tsx
+import { useTournamentStep } from '@well-played.gg/react-sdk';
+
+const TournamentBracket = ({ 
+  tournamentId, 
+  stepId 
+}: { 
+  tournamentId: string;
+  stepId: string;
+}) => {
+  const { groups, loading } = useTournamentStep({
+    tournamentId,
+    stepId,
+    skip: false,
+  });
+
+  if (loading) return <div>Loading bracket...</div>;
+
+  return (
+    <div>
+      {groups?.map(group => (
+        <div key={group.id}>
+          <h2>{group.name}</h2>
+          {group.rounds.map(round => (
+            <div key={round.id}>
+              <h3>Round {round.order}: {round.name}</h3>
+              {round.games.map(game => (
+                <div key={game.id}>
+                  {game.matches.map(match => (
+                    <div key={match.id}>
+                      <p>Status: {match.status}</p>
+                      {match.teamScores.map(teamScore => (
+                        <div key={teamScore.id}>
+                          {teamScore.name}: {teamScore.score}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+#### Parameters
+
+<ParamField path="tournamentId" type="string" required>
+  The ID of the tournament.
+</ParamField>
+
+<ParamField path="stepId" type="string" required>
+  The ID of the tournament step.
+</ParamField>
+
+<ParamField path="skip" type="boolean">
+  Skip the query if true.
+</ParamField>
+
+#### Return Values
+
+<ResponseField name="groups" type="Group[] | undefined">
+  Array of tournament groups with nested structure:
+  
+  ```typescript
+  {
+    id: string;
+    name: string;
+    rounds: Array<{
+      id: string;
+      name: string;
+      order: number;
+      games: Array<{
+        id: string;
+        order: number;
+        matches: Array<{
+          id: string;
+          order: number;
+          status: string;
+          teamScores: Array<{
+            id: string;
+            name: string;
+            score: number;
+            status: string;
+            members: Array<{...}>;
+          }>;
+        }>;
+      }>;
+    }>;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Whether the data is currently being fetched.
+</ResponseField>
+
+## Pagination Hooks
+
+For advanced pagination control, the SDK provides low-level pagination hooks:
+
+### usePaginatedQuery
+
+Fetches a paginated query and provides methods to load more data.
+
+```tsx
+import { usePaginatedQuery } from '@well-played.gg/react-sdk';
+import { graphql } from '@well-played.gg/typescript-sdk';
+
+const MY_QUERY = graphql(`
+  query MyQuery($page: PageInfo!) {
+    myData(page: $page) {
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+      nodes {
+        id
+        name
+      }
+    }
+  }
+`);
+
+const { data, loading, loadNextPage } = usePaginatedQuery(
+  MY_QUERY,
+  {
+    variables: {},
+    pageSize: 50,
+  }
+);
+```
+
+### usePaginatedLoadAll
+
+Automatically fetches all pages of a paginated query.
+
+```tsx
+import { usePaginatedLoadAll } from '@well-played.gg/react-sdk';
+
+const { results, loading, refetch } = usePaginatedLoadAll(
+  MY_QUERY,
+  {
+    variables: {},
+    onResults: (results) => {
+      console.log('Loaded all results:', results);
+    },
+  }
+);
+```
+
+<Warning>
+  Use `usePaginatedLoadAll` carefully with large datasets, as it will fetch all pages automatically.
+</Warning>
+
+## Common Patterns
+
+### Conditional Fetching
+
+Use the `skip` parameter to conditionally fetch data:
+
+```tsx
+const { results, loading } = usePlayers({
+  playerIds: selectedPlayerIds,
+  skip: !selectedPlayerIds || selectedPlayerIds.length === 0,
+});
+```
+
+### Refetching Data
+
+Manually refetch data when needed:
+
+```tsx
+const { results, loading, refetch } = useTournamentTeams({
+  tournamentId,
+  status: 'CONFIRMED',
+});
+
+// Later...
+<button onClick={() => refetch()}>Refresh Teams</button>
+```
+
+### Loading States
+
+Handle loading states gracefully:
+
+```tsx
+const { results, loading } = usePlayers({ playerIds });
+
+if (loading) {
+  return (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/2 mt-2"></div>
+    </div>
+  );
+}
+
+return <PlayerList players={results} />;
+```
+
+## Source References
+
+- `players.hook.ts:39-87` - `usePlayers` hook
+- `players.hook.ts:116-133` - `useConnectedPlayer` hook  
+- `teams.hook.ts:42-105` - `useTournamentTeams` hook
+- `tournaments.hook.ts:88-175` - `useTournamentStep` hook
+- `paginated-query.hook.ts:17-84` - `usePaginatedQuery` hook
+- `paginated-query.hook.ts:100-169` - `usePaginatedLoadAll` hook

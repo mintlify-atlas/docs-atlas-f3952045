@@ -1,0 +1,81 @@
+---
+title: Installation
+description: Install the WellPlayed TypeScript SDK and its dependencies
+---
+
+The WellPlayed TypeScript SDK provides a complete GraphQL client for interacting with the WellPlayed API.
+
+## Installation
+
+Install the SDK using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install @well-played.gg/typescript-sdk
+```
+
+```bash yarn
+yarn add @well-played.gg/typescript-sdk
+```
+
+```bash pnpm
+pnpm add @well-played.gg/typescript-sdk
+```
+</CodeGroup>
+
+## Dependencies
+
+The SDK has the following peer dependencies that you may need to install separately:
+
+### Required Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @apollo/client graphql
+```
+
+```bash yarn
+yarn add @apollo/client graphql
+```
+
+```bash pnpm
+pnpm add @apollo/client graphql
+```
+</CodeGroup>
+
+### Full Dependency List
+
+The SDK includes these dependencies automatically:
+
+- `@nerdwallet/apollo-cache-policies` - Advanced cache invalidation policies
+- `apollo3-cache-persist` - Cache persistence for offline support
+- `graphql-ws` - GraphQL subscriptions over WebSocket
+- `axios` - HTTP client for authentication
+- `lodash` - Utility functions
+
+<Note>
+If you're using the typed client instead of Apollo, you only need the `graphql` package as a peer dependency.
+</Note>
+
+## Package Information
+
+The SDK is distributed with multiple module formats:
+
+- **CommonJS**: `dist/wp-ts-sdk.cjs.js`
+- **ES Modules**: `dist/wp-ts-sdk.es.js`
+- **TypeScript Types**: `dist/index.d.ts`
+
+<Warning>
+Make sure you're using TypeScript 5.6+ for the best type inference experience.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Setup" icon="gear" href="/typescript/client-setup">
+    Configure the Apollo client with authentication and caching
+  </Card>
+  <Card title="Typed Client" icon="code" href="/typescript/typed-client">
+    Use the lightweight typed client for server-side usage
+  </Card>
+</CardGroup>

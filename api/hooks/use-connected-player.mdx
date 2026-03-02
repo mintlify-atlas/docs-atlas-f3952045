@@ -1,0 +1,202 @@
+---
+title: useConnectedPlayer
+description: Get the authenticated player's account information and authentication state
+---
+
+## useConnectedPlayer
+
+The `useConnectedPlayer` hook retrieves the currently authenticated player's account information, including their profiles, identities, and permissions. It also provides authentication methods for login and logout.
+
+### Returns
+
+<ResponseField name="data" type="object | undefined">
+  The authenticated player's account data.
+  
+  <Expandable title="getMyAccount properties">
+    <ResponseField name="id" type="string">
+      The unique identifier for the account.
+    </ResponseField>
+    
+    <ResponseField name="permissions" type="Array<{ id: string; resources: string[] }>">
+      The permissions associated with the account.
+    </ResponseField>
+    
+    <ResponseField name="profiles" type="Array<PlayerProfile>">
+      The player profiles associated with the account.
+      
+      <Expandable title="PlayerProfile properties">
+        <ResponseField name="id" type="string">
+          The unique identifier for the player profile.
+        </ResponseField>
+        
+        <ResponseField name="username" type="string">
+          The player's username.
+        </ResponseField>
+        
+        <ResponseField name="customFields" type="Array<{ property: string; value: string }>">
+          Custom fields associated with the player profile.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="identities" type="Array<{ providerId: string; properties: Array<{ property: string; value: string }> }>">
+      Authentication provider identities linked to the account.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the query is currently loading.
+</ResponseField>
+
+<ResponseField name="authenticated" type="boolean">
+  Whether the user is currently authenticated via OIDC.
+</ResponseField>
+
+<ResponseField name="refetch" type="() => Promise<void>">
+  A function to manually refetch the account data.
+</ResponseField>
+
+<ResponseField name="login" type="() => void">
+  A function to initiate the OIDC login flow.
+</ResponseField>
+
+<ResponseField name="logout" type="() => void">
+  A function to log out the current user.
+</ResponseField>
+
+### GraphQL Query
+
+This hook uses the following GraphQL query:
+
+```graphql
+query getMyAccount {
+  getMyAccount {
+    id
+    permissions {
+      id
+      resources
+    }
+    profiles {
+      id
+      username
+      customFields {
+        property
+        value
+      }
+    }
+    identities {
+      providerId
+      properties {
+        property
+        value
+      }
+    }
+  }
+}
+```
+
+### Usage Example
+
+```tsx
+import { useConnectedPlayer } from '@wellplayed.gg/react-sdk';
+
+const PlayerProfile = () => {
+  const {
+    data,
+    loading,
+    authenticated,
+    login,
+    logout,
+    refetch,
+  } = useConnectedPlayer();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!authenticated) {
+    return (
+      <div>
+        <p>Not logged in</p>
+        <button onClick={login}>Login</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>My Account</h2>
+      <p>Account ID: {data?.getMyAccount.id}</p>
+      
+      <h3>Profiles</h3>
+      {data?.getMyAccount.profiles.map((profile) => (
+        <div key={profile.id}>
+          <p>Username: {profile.username}</p>
+          <p>Profile ID: {profile.id}</p>
+        </div>
+      ))}
+      
+      <h3>Identities</h3>
+      {data?.getMyAccount.identities.map((identity, i) => (
+        <div key={i}>
+          <p>Provider: {identity.providerId}</p>
+        </div>
+      ))}
+      
+      <button onClick={() => refetch()}>Refresh</button>
+      <button onClick={logout}>Logout</button>
+    </div>
+  );
+};
+```
+
+### Type Definition
+
+```typescript
+type UseConnectedPlayerReturn = {
+  data?: {
+    getMyAccount: {
+      id: string;
+      permissions: Array<{
+        id: string;
+        resources: string[];
+      }>;
+      profiles: Array<{
+        id: string;
+        username: string;
+        customFields: Array<{
+          property: string;
+          value: string;
+        }>;
+      }>;
+      identities: Array<{
+        providerId: string;
+        properties: Array<{
+          property: string;
+          value: string;
+        }>;
+      }>;
+    };
+  };
+  loading: boolean;
+  authenticated: boolean;
+  refetch: () => Promise<void>;
+  login: () => void;
+  logout: () => void;
+};
+
+const useConnectedPlayer: () => UseConnectedPlayerReturn;
+```
+
+### Authentication Integration
+
+This hook integrates with the OIDC authentication system configured in `WellPlayedProvider`. The query automatically skips execution when the user is not authenticated (`!oidc.isAuthenticated`).
+
+The `login` and `logout` functions are provided by the `@axa-fr/react-oidc` library and handle the OIDC authentication flow automatically.
+
+### Notes
+
+- The query is skipped when the user is not authenticated to avoid unnecessary API calls.
+- Network status changes are monitored (`notifyOnNetworkStatusChange: true`) to keep the loading state accurate.
+- Uses the Apollo GraphQL client from `useWellPlayed` context.

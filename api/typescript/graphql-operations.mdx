@@ -1,0 +1,555 @@
+---
+title: GraphQL Operations
+description: Type-safe GraphQL query construction using gql.tada and Genql
+---
+
+## Overview
+
+The WellPlayed TypeScript SDK provides two complementary approaches for writing type-safe GraphQL operations:
+
+1. **Tagged Template Literals** using [gql.tada](https://gql-tada.0no.co/) - Write standard GraphQL queries with full TypeScript inference
+2. **Genql Operations** - Generate typed operation objects for use with `createTypedClient`
+
+Both approaches provide full type safety, autocomplete, and are validated against the WellPlayed GraphQL schema at compile time.
+
+## Tagged Template: `graphql`
+
+The `graphql` tagged template function creates type-safe GraphQL documents using standard GraphQL syntax.
+
+### Function Signature
+
+```typescript
+export const graphql: (
+  template: TemplateStringsArray,
+  ...substitutions: any[]
+) => TypedDocumentNode
+```
+
+Defined in `packages/typescript-sdk/src/graphql.ts:4`
+
+### Usage with Apollo Client
+
+The `graphql` function is designed to work with Apollo Client hooks and methods:
+
+```typescript
+import { graphql, type ResultOf, type VariablesOf } from '@well-played.gg/typescript-sdk';
+import { useQuery } from '@apollo/client';
+
+const GET_PLAYERS_QUERY = graphql(`
+  query players(
+    $ids: [ID!]!
+    $page: PageInfo!
+  ) {
+    players(
+      ids: $ids
+      page: $page
+    ) {
+      nodes {
+        id
+        username
+        ownerId
+        customFields {
+          property
+          value
+        }
+        identities {
+          providerId
+          properties {
+            property
+            value
+          }
+        }
+      }
+    }
+  }
+`);
+
+function PlayersComponent({ playerIds }: { playerIds: string[] }) {
+  const { data, loading } = useQuery(GET_PLAYERS_QUERY, {
+    variables: {
+      ids: playerIds,
+      page: { first: 100 },
+    },
+  });
+
+  if (loading) return <div>Loading...</div>;
+  return <div>{data?.players.nodes.map(p => p.username).join(', ')}</div>;
+}
+```
+
+From `packages/react-sdk/src/api/hooks/players.hook.ts:10-37`
+
+### Type Inference Utilities
+
+The SDK exports utilities to extract types from GraphQL documents:
+
+#### `ResultOf<T>`
+
+Extract the result type from a GraphQL document:
+
+```typescript
+import { graphql, type ResultOf } from '@well-played.gg/typescript-sdk';
+
+const TOURNAMENT_QUERY = graphql(`
+  query tournament($id: ID!) {
+    tournament(id: $id) {
+      id
+      name
+      status
+    }
+  }
+`);
+
+type TournamentResult = ResultOf<typeof TOURNAMENT_QUERY>;
+// { tournament: { id: string; name: string; status: string } }
+```
+
+#### `VariablesOf<T>`
+
+Extract the variables type from a GraphQL document:
+
+```typescript
+import { graphql, type VariablesOf } from '@well-played.gg/typescript-sdk';
+
+const TOURNAMENT_QUERY = graphql(`
+  query tournament($id: ID!) {
+    tournament(id: $id) {
+      id
+      name
+    }
+  }
+`);
+
+type TournamentVariables = VariablesOf<typeof TOURNAMENT_QUERY>;
+// { id: string }
+```
+
+#### `FragmentOf<T>`
+
+Extract the type of a GraphQL fragment:
+
+```typescript
+import { graphql, type FragmentOf, readFragment } from '@well-played.gg/typescript-sdk';
+
+const TEAM_FRAGMENT = graphql(`
+  fragment TeamFields on Team {
+    id
+    name
+    status
+  }
+`);
+
+type TeamData = FragmentOf<typeof TEAM_FRAGMENT>;
+// { id: string; name: string; status: string }
+
+function TeamCard({ team }: { team: TeamData }) {
+  const data = readFragment(TEAM_FRAGMENT, team);
+  return <div>{data.name}</div>;
+}
+```
+
+### Nested Type Extraction
+
+Extract types from nested fields in query results:
+
+```typescript
+import { graphql, type ResultOf } from '@well-played.gg/typescript-sdk';
+
+const TOURNAMENT_TEAMS_QUERY = graphql(`
+  query tournamentTeams(
+    $tournamentId: ID!
+    $page: PageInfo!
+    $status: TournamentTeamStatus
+  ) {
+    tournamentTeams(
+      tournamentId: $tournamentId
+      page: $page
+      memberStatus: ACCEPTED
+      status: $status
+    ) {
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+      nodes {
+        id
+        name
+        status
+        members {
+          status
+          playerProfileId
+        }
+      }
+    }
+  }
+`);
+
+// Extract the type of a single team
+type Team = ResultOf<typeof TOURNAMENT_TEAMS_QUERY>['tournamentTeams']['nodes'][0];
+
+// Extract the type of a single member
+type TeamMember = ResultOf<typeof TOURNAMENT_TEAMS_QUERY>['tournamentTeams']['nodes'][0]['members'][0];
+```
+
+From `packages/react-sdk/src/api/hooks/teams.hook.ts:7-34`
+
+### Real-World Example: Tournament Step Hook
+
+```typescript
+import { useQuery } from '@apollo/client';
+import { graphql, type ResultOf, type VariablesOf } from '@well-played.gg/typescript-sdk';
+
+const TOURNAMENT_STEP_SHAPE_QUERY = graphql(`
+  query tournamentStepGeneratedShape($stepId: ID!) {
+    tournamentStepGeneratedShape(stepId: $stepId) {
+      id
+      name
+      rounds {
+        id
+        name
+        order
+        games {
+          id
+          order
+          matches {
+            id
+            order
+            status
+          }
+        }
+      }
+    }
+  }
+`);
+
+const TOURNAMENT_STEP_SCORES_QUERY = graphql(`
+  query tournamentStepGroupRoundGameMatchScoresGetForStep(
+    $stepId: ID!
+    $page: PageInfo!
+  ) {
+    tournamentStepGroupRoundGameMatchScoresGetForStep(
+      stepId: $stepId
+      page: $page
+    ) {
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+      nodes {
+        teamId
+        status
+        score
+        matchId
+      }
+    }
+  }
+`);
+
+export const useTournamentStep = ({ stepId }: { stepId: string }) => {
+  const { loading: loadingShape, data: stepShape } = useQuery(
+    TOURNAMENT_STEP_SHAPE_QUERY,
+    {
+      variables: { stepId },
+    }
+  );
+
+  const { loading: loadingScores, data: scores } = useQuery(
+    TOURNAMENT_STEP_SCORES_QUERY,
+    {
+      variables: {
+        stepId,
+        page: { first: 100 },
+      },
+    }
+  );
+
+  return {
+    loading: loadingShape || loadingScores,
+    data: stepShape,
+    scores: scores?.tournamentStepGroupRoundGameMatchScoresGetForStep.nodes,
+  };
+};
+```
+
+From `packages/react-sdk/src/api/hooks/tournaments.hook.ts:9-50`
+
+## Genql Operations
+
+For use with `createTypedClient`, the SDK provides functions to generate typed GraphQL operations from selection objects.
+
+### `generateQueryOp`
+
+Generate a GraphQL query operation.
+
+#### Function Signature
+
+```typescript
+export const generateQueryOp: (
+  fields: QueryGenqlSelection & { __name?: string }
+) => GraphqlOperation
+```
+
+Defined in `packages/typescript-sdk/src/generated/index.ts:55-59`
+
+#### Usage
+
+```typescript
+import { generateQueryOp, type QueryResult } from '@well-played.gg/typescript-sdk';
+
+const queryOp = generateQueryOp({
+  __name: 'GetTournaments',
+  tournaments: {
+    __args: {
+      page: { first: 10 },
+    },
+    nodes: {
+      id: true,
+      name: true,
+      status: true,
+    },
+  },
+});
+
+// queryOp contains: { query: string, variables: object }
+console.log(queryOp.query);
+```
+
+#### Type Inference
+
+```typescript
+import { type QueryResult } from '@well-played.gg/typescript-sdk';
+
+type TournamentsQuery = QueryResult<{
+  tournaments: {
+    nodes: {
+      id: true;
+      name: true;
+      status: true;
+    };
+  };
+}>;
+
+// TournamentsQuery is fully typed based on selection
+```
+
+### `generateMutationOp`
+
+Generate a GraphQL mutation operation.
+
+#### Function Signature
+
+```typescript
+export const generateMutationOp: (
+  fields: MutationGenqlSelection & { __name?: string }
+) => GraphqlOperation
+```
+
+Defined in `packages/typescript-sdk/src/generated/index.ts:63-67`
+
+#### Usage
+
+```typescript
+import { generateMutationOp, type MutationResult } from '@well-played.gg/typescript-sdk';
+
+const mutationOp = generateMutationOp({
+  __name: 'CreateTournament',
+  tournamentCreate: {
+    __args: {
+      input: {
+        name: 'Summer Championship',
+        game: 'fortnite',
+      },
+    },
+    id: true,
+    name: true,
+    status: true,
+  },
+});
+```
+
+#### Type Inference
+
+```typescript
+import { type MutationResult } from '@well-played.gg/typescript-sdk';
+
+type CreateTournamentMutation = MutationResult<{
+  tournamentCreate: {
+    id: true;
+    name: true;
+    status: true;
+  };
+}>;
+```
+
+### `generateSubscriptionOp`
+
+Generate a GraphQL subscription operation.
+
+#### Function Signature
+
+```typescript
+export const generateSubscriptionOp: (
+  fields: SubscriptionGenqlSelection & { __name?: string }
+) => GraphqlOperation
+```
+
+Defined in `packages/typescript-sdk/src/generated/index.ts:71-79`
+
+#### Usage
+
+```typescript
+import { generateSubscriptionOp, type SubscriptionResult } from '@well-played.gg/typescript-sdk';
+
+const subscriptionOp = generateSubscriptionOp({
+  __name: 'TournamentUpdates',
+  tournamentUpdated: {
+    __args: {
+      id: 'tournament_123',
+    },
+    id: true,
+    name: true,
+    status: true,
+  },
+});
+```
+
+<Note>
+  Subscriptions are only supported with `createWellPlayedClient` (Apollo Client), not with `createTypedClient`.
+</Note>
+
+## GraphQL Operation Object
+
+All generate functions return a `GraphqlOperation` object:
+
+<ResponseField name="query" type="string">
+  The GraphQL query string.
+</ResponseField>
+
+<ResponseField name="variables" type="Record<string, any>">
+  The operation variables extracted from `__args`.
+</ResponseField>
+
+<ResponseField name="operationName" type="string">
+  The operation name from the `__name` field.
+</ResponseField>
+
+## Type Safety Features
+
+### Schema Validation
+
+All GraphQL operations are validated against the WellPlayed schema at **compile time**:
+
+```typescript
+import { graphql } from '@well-played.gg/typescript-sdk';
+
+// ✅ Valid query - compiles successfully
+const VALID_QUERY = graphql(`
+  query {
+    tournaments(page: { first: 10 }) {
+      nodes {
+        id
+        name
+      }
+    }
+  }
+`);
+
+// ❌ Invalid query - TypeScript error
+const INVALID_QUERY = graphql(`
+  query {
+    tournaments(page: { first: 10 }) {
+      nodes {
+        id
+        invalidField  # TypeScript error: Field doesn't exist
+      }
+    }
+  }
+`);
+```
+
+### Variable Type Checking
+
+```typescript
+import { graphql } from '@well-played.gg/typescript-sdk';
+import { useQuery } from '@apollo/client';
+
+const GET_TOURNAMENT = graphql(`
+  query tournament($id: ID!) {
+    tournament(id: $id) {
+      id
+      name
+    }
+  }
+`);
+
+// ✅ Correct usage
+useQuery(GET_TOURNAMENT, {
+  variables: { id: 'tournament_123' },
+});
+
+// ❌ TypeScript error: missing required variable
+useQuery(GET_TOURNAMENT, {
+  variables: {},
+});
+
+// ❌ TypeScript error: wrong variable type
+useQuery(GET_TOURNAMENT, {
+  variables: { id: 123 },
+});
+```
+
+### Response Type Inference
+
+```typescript
+import { graphql, type ResultOf } from '@well-played.gg/typescript-sdk';
+import { useQuery } from '@apollo/client';
+
+const GET_TOURNAMENT = graphql(`
+  query tournament($id: ID!) {
+    tournament(id: $id) {
+      id
+      name
+      status
+    }
+  }
+`);
+
+function TournamentComponent({ id }: { id: string }) {
+  const { data } = useQuery(GET_TOURNAMENT, {
+    variables: { id },
+  });
+
+  // TypeScript knows the exact shape of data
+  if (data?.tournament) {
+    // ✅ TypeScript autocomplete works
+    console.log(data.tournament.name);
+    console.log(data.tournament.status);
+
+    // ❌ TypeScript error: property doesn't exist
+    console.log(data.tournament.invalidField);
+  }
+}
+```
+
+## Scalar Types
+
+The SDK configures custom scalar types for type safety:
+
+```typescript
+{
+  scalars: {
+    ID: string,
+    DateTime: string,
+  }
+}
+```
+
+Defined in `packages/typescript-sdk/src/graphql.ts:4-10`
+
+- **ID**: Represented as `string` in TypeScript
+- **DateTime**: Represented as `string` (ISO 8601 format)
+
+## Related
+
+- [createWellPlayedClient](/api/typescript/create-wellplayed-client) - Apollo Client for use with `graphql` tagged templates
+- [createTypedClient](/api/typescript/create-typed-client) - Lightweight client for use with Genql operations

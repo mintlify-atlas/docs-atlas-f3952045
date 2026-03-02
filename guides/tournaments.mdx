@@ -1,0 +1,285 @@
+---
+title: 'Tournament Management'
+description: 'Learn how to fetch and display tournament data using the WellPlayed React SDK'
+---
+
+## Overview
+
+The WellPlayed React SDK provides powerful hooks for managing tournament data, including tournament steps, rounds, games, and matches with real-time scores.
+
+## useTournamentStep Hook
+
+The `useTournamentStep` hook fetches the complete structure of a tournament step, including groups, rounds, games, matches, and team scores.
+
+### Basic Usage
+
+```tsx
+import { useTournamentStep } from '@well-played.gg/react-sdk';
+
+const TournamentStep = () => {
+  const { tournamentId, stepId } = useParams();
+  const { loading, groups } = useTournamentStep({
+    tournamentId: tournamentId ?? '',
+    stepId: stepId ?? '',
+  });
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      {groups?.map((group) => (
+        <div key={group.id}>
+          <h2>{group.name}</h2>
+          {/* Render rounds, games, and matches */}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+<Info>
+  The hook automatically fetches tournament teams and scores, combining them into a single data structure for easy rendering.
+</Info>
+
+### Parameters
+
+<ParamField path="tournamentId" type="string" required>
+  The ID of the tournament
+</ParamField>
+
+<ParamField path="stepId" type="string" required>
+  The ID of the tournament step to fetch
+</ParamField>
+
+<ParamField path="skip" type="boolean" default="false">
+  Whether to skip fetching the data. Useful for conditional rendering.
+</ParamField>
+
+### Return Value
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the data is currently being fetched
+</ResponseField>
+
+<ResponseField name="groups" type="Group[]">
+  Array of tournament groups containing the complete hierarchy
+</ResponseField>
+
+## Tournament Step Structure
+
+The tournament step data follows a hierarchical structure:
+
+<Steps>
+  <Step title="Groups">
+    The top level of the tournament structure. Each group contains multiple rounds.
+  </Step>
+  
+  <Step title="Rounds">
+    Rounds within a group. Each round contains multiple games and has an order property.
+    
+    ```tsx
+    {groups?.map((group) => (
+      <div key={group.id}>
+        {group.rounds.map((round) => (
+          <div key={round.id}>
+            Round #{round.order} - {round.name}
+          </div>
+        ))}
+      </div>
+    ))}
+    ```
+  </Step>
+  
+  <Step title="Games">
+    Games within a round. Each game contains multiple matches.
+    
+    ```tsx
+    {round.games.map((game) => (
+      <div key={game.id}>
+        Game #{game.order}
+      </div>
+    ))}
+    ```
+  </Step>
+  
+  <Step title="Matches">
+    Individual matches within a game, including team scores and match status.
+    
+    ```tsx
+    {game.matches.map((match) => (
+      <div key={match.id}>
+        <p>Match #{match.order} - Status: {match.status}</p>
+        {match.teamScores.map((team) => (
+          <div key={team.id}>
+            {team.name} - {team.score}
+          </div>
+        ))}
+      </div>
+    ))}
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a real-world example from the WellPlayed demo application (source: `demo/src/features/tournaments/tournament-step.tsx:1`):
+
+```tsx
+import { useTournamentStep } from '@well-played.gg/react-sdk';
+import React from 'react';
+import { useParams } from 'react-router-dom';
+
+export const TournamentStep = () => {
+  const { tournamentId, stepId } = useParams<{
+    tournamentId: string;
+    stepId: string;
+  }>();
+  const { loading, groups } = useTournamentStep({
+    tournamentId: tournamentId ?? '',
+    stepId: stepId ?? '',
+  });
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      <h1>Tournament Step</h1>
+      {groups?.map((group) => (
+        <div key={group.id}>
+          {group.name}
+          <div style={{ display: 'flex' }}>
+            {group.rounds.map((round) => (
+              <div
+                key={round.id}
+                style={{ flex: 1, border: '1px solid black' }}
+              >
+                Round #{round.id} - {round.name}
+                {round.games.map((game) => (
+                  <div key={game.id}>
+                    Game #{game.id}
+                    {game.matches.map((match) => (
+                      <div key={match.id}>
+                        Match #{match.id}
+                        {match.teamScores.map((team) => (
+                          <div key={team.id}>
+                            {team.name} - {team.score}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+<Note>
+  The `useTournamentStep` hook internally uses GraphQL queries defined in `packages/react-sdk/src/api/hooks/tournaments.hook.ts:9` to fetch the tournament shape and scores.
+</Note>
+
+## GraphQL Queries Used
+
+The hook uses two main queries:
+
+### Tournament Step Shape Query
+
+```graphql
+query tournamentStepGeneratedShape($stepId: ID!) {
+  tournamentStepGeneratedShape(stepId: $stepId) {
+    id
+    name
+    rounds {
+      id
+      name
+      order
+      games {
+        id
+        order
+        matches {
+          id
+          order
+          status
+        }
+      }
+    }
+  }
+}
+```
+
+### Match Scores Query
+
+```graphql
+query tournamentStepGroupRoundGameMatchScoresGetForStep($stepId: ID!, $page: PageInfo!) {
+  tournamentStepGroupRoundGameMatchScoresGetForStep(
+    stepId: $stepId
+    page: $page
+  ) {
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+    nodes {
+      teamId
+      status
+      score
+      matchId
+    }
+  }
+}
+```
+
+<Tip>
+  The hook automatically combines data from multiple queries and normalizes it into a single, easy-to-use data structure. You don't need to manage multiple queries manually.
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Handle Loading States">
+    Always check the `loading` state before rendering tournament data to prevent undefined errors:
+    
+    ```tsx
+    if (loading) {
+      return <LoadingSpinner />;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Skip Parameter Wisely">
+    Use the `skip` parameter to prevent unnecessary queries when you don't have the required IDs:
+    
+    ```tsx
+    const { loading, groups } = useTournamentStep({
+      tournamentId,
+      stepId,
+      skip: !tournamentId || !stepId,
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Check for Undefined Data">
+    Always use optional chaining when accessing nested properties:
+    
+    ```tsx
+    {groups?.map((group) => (
+      // Your rendering logic
+    ))}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Hooks
+
+- [useTournamentTeams](/guides/teams) - Fetch tournament team data
+- [usePaginatedQuery](/guides/error-handling) - Understand pagination patterns

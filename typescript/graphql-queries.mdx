@@ -1,0 +1,360 @@
+---
+title: GraphQL Queries
+description: Write type-safe GraphQL queries using gql.tada and generate operations
+---
+
+The SDK provides the `graphql` tagged template literal from `gql.tada` for writing fully type-safe GraphQL queries with autocomplete and validation.
+
+## The graphql Tagged Template
+
+Import the `graphql` function to write type-safe queries:
+
+```typescript
+import { graphql, type ResultOf, type VariablesOf } from '@well-played.gg/typescript-sdk';
+```
+
+### Type Signature
+
+From `graphql.ts:4-10`:
+
+```typescript
+export const graphql = initGraphQLTada<{
+  introspection: introspection;
+  scalars: {
+    ID: string;
+    DateTime: string;
+  };
+}>();
+```
+
+The SDK includes these utility types:
+- `ResultOf<Query>` - Extract the result type of a query
+- `VariablesOf<Query>` - Extract the variables type of a query
+- `FragmentOf<Fragment>` - Extract the type of a fragment
+- `readFragment()` - Read fragment data
+
+## Writing Queries
+
+<Steps>
+  <Step title="Define the Query">
+    Use the `graphql` tagged template to define your query:
+
+    ```typescript
+    const GET_PLAYERS_QUERY = graphql(`
+      query players(
+        $ids: [ID!]!
+        $page: PageInfo!
+      ) {
+        players(
+          ids: $ids
+          page: $page
+        ) {
+          nodes {
+            id
+            username
+            ownerId
+            customFields {
+              property
+              value
+            }
+            identities {
+              providerId
+              properties {
+                property
+                value
+              }
+            }
+          }
+        }
+      }
+    `);
+    ```
+
+    From `players.hook.ts:10-37`
+  </Step>
+
+  <Step title="Extract Types">
+    Use `ResultOf` and `VariablesOf` to get fully typed results:
+
+    ```typescript
+    type PlayersResult = ResultOf<typeof GET_PLAYERS_QUERY>;
+    type PlayersVariables = VariablesOf<typeof GET_PLAYERS_QUERY>;
+
+    // PlayersResult is fully typed:
+    // {
+    //   players: {
+    //     nodes: Array<{
+    //       id: string;
+    //       username: string;
+    //       ownerId: string;
+    //       customFields: Array<{ property: string; value: string }>;
+    //       ...
+    //     }>;
+    //   };
+    // }
+    ```
+  </Step>
+
+  <Step title="Use with Apollo Client">
+    Pass the query to Apollo hooks:
+
+    ```typescript
+    import { useQuery } from '@apollo/client';
+
+    const { data, loading, error } = useQuery(GET_PLAYERS_QUERY, {
+      variables: {
+        ids: ['player-1', 'player-2'],
+        page: { first: 100 }
+      }
+    });
+
+    // data is fully typed as PlayersResult
+    ```
+  </Step>
+</Steps>
+
+## Query Examples from React SDK
+
+### Tournament Teams Query
+
+From `teams.hook.ts:7-34`:
+
+```typescript
+const TOURNAMENT_TEAM_QUERY = graphql(`
+  query tournamentTeam(
+    $tournamentId: ID!
+    $page: PageInfo!
+    $status: TournamentTeamStatus
+  ) {
+    tournamentTeams(
+      tournamentId: $tournamentId
+      page: $page
+      memberStatus: ACCEPTED
+      status: $status
+    ) {
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+      nodes {
+        id
+        name
+        status
+        members {
+          status
+          playerProfileId
+        }
+      }
+    }
+  }
+`);
+```
+
+### Tournament Step Query
+
+From `tournaments.hook.ts:9-30`:
+
+```typescript
+const TOURNAMENT_STEP_SHAPE_QUERY = graphql(`
+  query tournamentStepGeneratedShape($stepId: ID!) {
+    tournamentStepGeneratedShape(stepId: $stepId) {
+      id
+      name
+      rounds {
+        id
+        name
+        order
+        games {
+          id
+          order
+          matches {
+            id
+            order
+            status
+          }
+        }
+      }
+    }
+  }
+`);
+```
+
+### My Account Query
+
+From `players.hook.ts:89-114`:
+
+```typescript
+const GET_MY_PLAYER_QUERY = graphql(`
+  query getMyAccount {
+    getMyAccount {
+      id
+      permissions {
+        id
+        resources
+      }
+      profiles {
+        id
+        username
+        customFields {
+          property
+          value
+        }
+      }
+      identities {
+        providerId
+        properties {
+          property
+          value
+        }
+      }
+    }
+  }
+`);
+```
+
+## Extracting Nested Types
+
+You can extract types from nested query results:
+
+```typescript
+const TOURNAMENT_TEAM_QUERY = graphql(`
+  query tournamentTeam($tournamentId: ID!, $page: PageInfo!) {
+    tournamentTeams(tournamentId: $tournamentId, page: $page) {
+      nodes {
+        id
+        name
+        members {
+          playerProfileId
+          status
+        }
+      }
+    }
+  }
+`);
+
+// Extract just the team type
+type Team = ResultOf<typeof TOURNAMENT_TEAM_QUERY>['tournamentTeams']['nodes'][0];
+
+// Extract just the member type
+type Member = ResultOf<typeof TOURNAMENT_TEAM_QUERY>['tournamentTeams']['nodes'][0]['members'][0];
+```
+
+From `tournaments.hook.ts:52-54`
+
+## Generate Operation Functions
+
+For use with the typed client or custom fetchers, generate operation objects:
+
+```typescript
+import { 
+  generateQueryOp, 
+  generateMutationOp, 
+  generateSubscriptionOp 
+} from '@well-played.gg/typescript-sdk';
+```
+
+### Type Signatures
+
+From `generated/index.ts:55-79`:
+
+```typescript
+export const generateQueryOp: (
+  fields: QueryGenqlSelection & { __name?: string },
+) => GraphqlOperation
+
+export const generateMutationOp: (
+  fields: MutationGenqlSelection & { __name?: string },
+) => GraphqlOperation
+
+export const generateSubscriptionOp: (
+  fields: SubscriptionGenqlSelection & { __name?: string },
+) => GraphqlOperation
+```
+
+### Usage Example
+
+```typescript
+import { generateQueryOp } from '@well-played.gg/typescript-sdk';
+
+const operation = generateQueryOp({
+  __name: 'GetPlayers',
+  players: {
+    __args: {
+      ids: ['player-1'],
+      page: { first: 10 }
+    },
+    nodes: {
+      id: true,
+      username: true
+    }
+  }
+});
+
+// operation contains:
+// { query: string, variables: object }
+```
+
+<Note>
+These functions are primarily used with the typed client. For Apollo Client usage, prefer the `graphql` tagged template.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Name your queries">
+    Always give your queries descriptive names for better debugging:
+
+    ```typescript
+    const QUERY = graphql(`
+      query getTournamentById($id: ID!) {
+        tournament(id: $id) {
+          id
+          name
+        }
+      }
+    `);
+    ```
+  </Accordion>
+
+  <Accordion title="Extract common fragments">
+    Use GraphQL fragments to reuse field selections:
+
+    ```typescript
+    const PlayerFragment = graphql(`
+      fragment PlayerFields on Player {
+        id
+        username
+        customFields {
+          property
+          value
+        }
+      }
+    `);
+
+    const QUERY = graphql(`
+      query getPlayers($ids: [ID!]!) {
+        players(ids: $ids, page: { first: 100 }) {
+          nodes {
+            ...PlayerFields
+          }
+        }
+      }
+    `, [PlayerFragment]);
+    ```
+  </Accordion>
+
+  <Accordion title="Type your query results">
+    Extract types for reusability across your application:
+
+    ```typescript
+    const QUERY = graphql(`...`);
+
+    export type TournamentData = ResultOf<typeof QUERY>;
+    export type TournamentVariables = VariablesOf<typeof QUERY>;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+The `graphql` tagged template requires the GraphQL schema introspection to be up to date. Run `yarn gql-tada:generate` if you get type errors after schema updates.
+</Warning>

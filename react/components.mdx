@@ -1,0 +1,256 @@
+---
+title: Components
+description: React components provided by the WellPlayed SDK
+---
+
+## RichTextEditorContent
+
+A secure component for rendering HTML-based rich text content from WellPlayed, such as tournament descriptions, event descriptions, and other user-generated content.
+
+### Overview
+
+The `RichTextEditorContent` component uses TipTap to safely render rich text content with support for:
+
+- Text formatting (bold, italic, underline)
+- Headings and paragraphs
+- Lists and code blocks
+- Text alignment
+- Subscript and superscript
+- Syntax highlighting
+- Links
+
+<Note>
+  This component is **read-only** and designed for displaying content. It's not an editor component.
+</Note>
+
+### Props
+
+<ParamField path="content" type="string" required>
+  The rich text content to render, in HTML or TipTap JSON format.
+</ParamField>
+
+<ParamField path="style" type="React.CSSProperties">
+  Optional CSS styles to apply to the container div.
+</ParamField>
+
+### Basic Usage
+
+```tsx
+import { RichTextEditorContent } from '@well-played.gg/react-sdk';
+
+const TournamentDescription = ({ description }: { description: string }) => {
+  return (
+    <RichTextEditorContent 
+      content={description}
+    />
+  );
+};
+```
+
+### With Custom Styling
+
+Apply custom styles to the content container:
+
+```tsx
+import { RichTextEditorContent } from '@well-played.gg/react-sdk';
+
+const StyledContent = ({ content }: { content: string }) => {
+  return (
+    <RichTextEditorContent 
+      content={content}
+      style={{
+        padding: '1rem',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '8px',
+        maxWidth: '800px',
+      }}
+    />
+  );
+};
+```
+
+### Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Tournament Info" icon="trophy">
+    Display tournament descriptions and rules
+  </Card>
+  <Card title="Event Details" icon="calendar">
+    Show event descriptions and schedules
+  </Card>
+  <Card title="Announcements" icon="megaphone">
+    Render formatted announcements
+  </Card>
+  <Card title="User Profiles" icon="user">
+    Display rich user bios and profiles
+  </Card>
+</CardGroup>
+
+### Supported Extensions
+
+The component includes the following TipTap extensions:
+
+<AccordionGroup>
+  <Accordion title="StarterKit" icon="star">
+    Includes essential editing features:
+    - Bold, italic, strike
+    - Headings (h1-h6)
+    - Paragraphs
+    - Lists (ordered and unordered)
+    - Code blocks
+    - Blockquotes
+    - Hard breaks
+    - Horizontal rules
+  </Accordion>
+
+  <Accordion title="Underline" icon="underline">
+    Renders underlined text.
+  </Accordion>
+
+  <Accordion title="Superscript" icon="superscript">
+    Renders superscript text (e.g., x²).
+  </Accordion>
+
+  <Accordion title="Subscript" icon="subscript">
+    Renders subscript text (e.g., H₂O).
+  </Accordion>
+
+  <Accordion title="Highlight" icon="highlighter">
+    Renders highlighted/marked text.
+  </Accordion>
+
+  <Accordion title="TextAlign" icon="align-left">
+    Supports text alignment for headings and paragraphs:
+    - Left
+    - Center
+    - Right
+    - Justify
+  </Accordion>
+</AccordionGroup>
+
+### Security
+
+<Warning>
+  The component uses TipTap's built-in sanitization to prevent XSS attacks. Content is rendered safely even when it includes HTML.
+</Warning>
+
+The component:
+- **Does not** execute scripts in the content
+- **Sanitizes** HTML to prevent XSS vulnerabilities
+- **Validates** content structure
+- **Is read-only** by default (editable={false})
+
+### Full Example
+
+Complete example fetching and displaying tournament content:
+
+```tsx
+import { RichTextEditorContent } from '@well-played.gg/react-sdk';
+import { useState, useEffect } from 'react';
+
+const TournamentDetails = ({ tournamentId }: { tournamentId: string }) => {
+  const [tournament, setTournament] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch tournament data
+    fetchTournament(tournamentId)
+      .then(setTournament)
+      .finally(() => setLoading(false));
+  }, [tournamentId]);
+
+  if (loading) {
+    return <div>Loading tournament details...</div>;
+  }
+
+  return (
+    <div>
+      <h1>{tournament.name}</h1>
+      
+      <section>
+        <h2>Description</h2>
+        <RichTextEditorContent 
+          content={tournament.description}
+          style={{
+            padding: '1.5rem',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            border: '1px solid #e5e5e5',
+          }}
+        />
+      </section>
+
+      <section>
+        <h2>Rules</h2>
+        <RichTextEditorContent 
+          content={tournament.rules}
+          style={{
+            padding: '1.5rem',
+            backgroundColor: '#fffbeb',
+            borderRadius: '8px',
+            border: '1px solid #fbbf24',
+          }}
+        />
+      </section>
+    </div>
+  );
+};
+```
+
+### Styling Tips
+
+<Tabs>
+  <Tab title="CSS Modules">
+    ```tsx
+    import styles from './content.module.css';
+    
+    <RichTextEditorContent 
+      content={content}
+      style={{ className: styles.richContent }}
+    />
+    ```
+    
+    ```css content.module.css
+    .richContent {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+    }
+    
+    .richContent h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    
+    .richContent p {
+      margin-bottom: 0.75rem;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Tailwind CSS">
+    ```tsx
+    <div className="prose prose-lg max-w-none">
+      <RichTextEditorContent content={content} />
+    </div>
+    ```
+  </Tab>
+  
+  <Tab title="Inline Styles">
+    ```tsx
+    <RichTextEditorContent 
+      content={content}
+      style={{
+        fontFamily: 'system-ui, sans-serif',
+        lineHeight: 1.6,
+        color: '#333',
+      }}
+    />
+    ```
+  </Tab>
+</Tabs>
+
+## Source Reference
+
+Component implementation:
+- `rich-text-editor-content.tsx:9-30` - `RichTextEditorContent` component
+- `rich-text-editor-content.tsx:1-7` - TipTap extension imports

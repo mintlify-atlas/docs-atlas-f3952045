@@ -1,0 +1,69 @@
+---
+title: useWellPlayed
+description: Access the WellPlayed context including organization ID, API clients, and access token
+---
+
+## useWellPlayed
+
+The `useWellPlayed` hook provides access to the WellPlayed context, including the organization ID, GraphQL API client, typed client, and the current access token.
+
+### Returns
+
+<ResponseField name="organizationId" type="string">
+  The organization ID configured in the `WellPlayedProvider`.
+</ResponseField>
+
+<ResponseField name="apiClient" type="ApolloClient<NormalizedCacheObject>">
+  The Apollo GraphQL client configured for the WellPlayed API. Use this for making GraphQL queries and mutations.
+</ResponseField>
+
+<ResponseField name="typedClient" type="ReturnType<typeof createTypedClient>">
+  The typed client for making type-safe API requests to the WellPlayed API.
+</ResponseField>
+
+<ResponseField name="accessToken" type="string | undefined">
+  The current OIDC access token, if the user is authenticated. Returns `undefined` if not authenticated.
+</ResponseField>
+
+### Usage Example
+
+```tsx
+import { useWellPlayed } from '@wellplayed.gg/react-sdk';
+
+const MyComponent = () => {
+  const { organizationId, apiClient, typedClient, accessToken } = useWellPlayed();
+  
+  console.log('Organization ID:', organizationId);
+  console.log('Is authenticated:', !!accessToken);
+  
+  // Use the clients to interact with the WellPlayed API
+  // ...
+  
+  return <div>My Component</div>;
+};
+```
+
+### Error Handling
+
+This hook will throw an error if used outside of a `WellPlayedProvider`:
+
+```
+Error: useWellPlayed must be used within a WellPlayedProvider
+```
+
+Make sure your component is wrapped with `WellPlayedProvider` before using this hook.
+
+### Type Definition
+
+```typescript
+const useWellPlayed: () => {
+  organizationId: string;
+  apiClient: ApolloClient<NormalizedCacheObject>;
+  typedClient: ReturnType<typeof createTypedClient>;
+  accessToken?: string;
+}
+```
+
+### Related
+
+- [WellPlayedProvider](/api/components/wellplayed-provider) - The provider component that must wrap your app

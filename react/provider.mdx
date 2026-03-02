@@ -1,0 +1,173 @@
+---
+title: Provider
+description: Configure the WellPlayedProvider component to integrate WellPlayed into your React application
+---
+
+## Overview
+
+The `WellPlayedProvider` is the root component that wraps your application and provides access to WellPlayed's authentication, GraphQL client, and API services.
+
+## Basic Setup
+
+Wrap your application with the `WellPlayedProvider` component:
+
+```tsx
+import { WellPlayedProvider } from '@well-played.gg/react-sdk';
+import { RouterProvider } from 'react-router-dom';
+
+const App = () => {
+  return (
+    <WellPlayedProvider
+      organizationId="your-organization-id"
+      wpAppConfig={{
+        scope: "offline_access",
+        client_id: "your-app-client-id",
+        redirect_uri: `${window.location.protocol}//${window.location.host}/login`,
+      }}
+    >
+      <RouterProvider router={router} />
+    </WellPlayedProvider>
+  );
+};
+```
+
+<Warning>
+  The `redirect_uri` must match exactly with the redirect URI configured in your App Client settings on the WellPlayed Console.
+</Warning>
+
+## Configuration Props
+
+### Required Props
+
+<ParamField path="organizationId" type="string" required>
+  Your organization ID from the WellPlayed Console.
+</ParamField>
+
+<ParamField path="wpAppConfig" type="object" required>
+  Application configuration object containing authentication settings.
+  
+  <Expandable title="wpAppConfig properties">
+    <ParamField path="client_id" type="string" required>
+      The client ID of your application from the [WellPlayed Console](https://console.well-played.gg/apps).
+    </ParamField>
+    
+    <ParamField path="redirect_uri" type="string" required>
+      The redirect URI where users will be sent after authentication. Must match the URI configured in your App Client settings.
+    </ParamField>
+    
+    <ParamField path="scope" type="string" required>
+      OAuth scopes for your application. Use `"offline_access"` to enable refresh tokens and maintain user sessions.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Optional Props
+
+<ParamField path="oidcConfig" type="object">
+  Additional OIDC configuration options. This extends the `OidcProviderProps` from `@axa-fr/react-oidc`.
+  
+  <Expandable title="oidcConfig properties">
+    You can customize OIDC behavior by providing additional configuration. Common fields that can be overridden are defined in the OIDC configuration interface, excluding:
+    - `client_id` (use `wpAppConfig.client_id`)
+    - `redirect_uri` (use `wpAppConfig.redirect_uri`)
+    - `scope` (use `wpAppConfig.scope`)
+    - `response_type`, `authority`, and related authority settings (managed automatically)
+  </Expandable>
+</ParamField>
+
+<ParamField path="clientConfig" type="object">
+  GraphQL client configuration options (excluding `token` and `organizationId` which are managed automatically).
+</ParamField>
+
+<ParamField path="apiBaseUrl" type="ApiBaseUrl">
+  Custom API base URL. Defaults to `"well-played.gg"`.
+</ParamField>
+
+<ParamField path="typedClientConfig" type="object">
+  Configuration for the typed API client (excluding `url`, `headers`, `batch`, `keepalive`, and `method` which are managed automatically).
+</ParamField>
+
+## useWellPlayed Hook
+
+Access WellPlayed context anywhere in your application:
+
+```tsx
+import { useWellPlayed } from '@well-played.gg/react-sdk';
+
+const MyComponent = () => {
+  const { organizationId, apiClient, typedClient, accessToken } = useWellPlayed();
+  
+  // Use the context values
+  return <div>Organization: {organizationId}</div>;
+};
+```
+
+### Return Values
+
+<ResponseField name="organizationId" type="string">
+  Your organization ID.
+</ResponseField>
+
+<ResponseField name="apiClient" type="ApolloClient<NormalizedCacheObject>">
+  Configured Apollo Client instance for GraphQL queries.
+</ResponseField>
+
+<ResponseField name="typedClient" type="ReturnType<typeof createTypedClient>">
+  Typed API client for making REST API calls.
+</ResponseField>
+
+<ResponseField name="accessToken" type="string | undefined">
+  Current OIDC access token (if user is authenticated).
+</ResponseField>
+
+<Note>
+  The `useWellPlayed` hook must be used within a component that's wrapped by `WellPlayedProvider`, otherwise it will throw an error.
+</Note>
+
+## Advanced Configuration
+
+### Custom API Base URL
+
+For testing or custom deployments:
+
+```tsx
+<WellPlayedProvider
+  organizationId="your-org-id"
+  wpAppConfig={{
+    scope: "offline_access",
+    client_id: "your-client-id",
+    redirect_uri: "https://your-app.com/login",
+  }}
+  apiBaseUrl="custom-domain.com"
+>
+  {children}
+</WellPlayedProvider>
+```
+
+### With Custom OIDC Configuration
+
+```tsx
+<WellPlayedProvider
+  organizationId="your-org-id"
+  wpAppConfig={{
+    scope: "offline_access",
+    client_id: "your-client-id",
+    redirect_uri: "https://your-app.com/login",
+  }}
+  oidcConfig={{
+    configuration: {
+      // Additional OIDC configuration
+      silent_redirect_uri: "https://your-app.com/silent-renew",
+    },
+  }}
+>
+  {children}
+</WellPlayedProvider>
+```
+
+## Source Reference
+
+The provider implementation can be found in:
+- `wp.provider.tsx:135-151` - `WellPlayedProvider` component
+- `wp.provider.tsx:86-94` - `useWellPlayed` hook
+- `wp.provider.tsx:20-75` - Type definitions

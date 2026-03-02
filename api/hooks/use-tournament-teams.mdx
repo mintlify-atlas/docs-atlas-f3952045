@@ -1,0 +1,192 @@
+---
+title: useTournamentTeams
+description: Fetch all teams and their members for a tournament with player data
+---
+
+## useTournamentTeams
+
+The `useTournamentTeams` hook fetches all teams for a specific tournament, including team members and their associated player profile information. It automatically handles pagination and enriches team member data with full player profiles.
+
+### Parameters
+
+<ParamField path="tournamentId" type="string" required>
+  The unique identifier of the tournament.
+</ParamField>
+
+<ParamField path="skip" type="boolean" default={false}>
+  Whether to skip fetching the data. When `true`, the query will not execute.
+</ParamField>
+
+<ParamField path="status" type="TournamentTeamStatus">
+  Filter teams by their status. Possible values include team status types defined in the GraphQL schema.
+</ParamField>
+
+### Returns
+
+<ResponseField name="results" type="TournamentTeam[]">
+  An array of tournament teams with enriched member data.
+  
+  <Expandable title="TournamentTeam properties">
+    <ResponseField name="id" type="string">
+      The unique identifier for the team.
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The name of the team.
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      The current status of the team in the tournament.
+    </ResponseField>
+    
+    <ResponseField name="members" type="TeamMember[]">
+      Array of team members with their player information.
+      
+      <Expandable title="TeamMember properties">
+        <ResponseField name="status" type="string">
+          The status of the team member (e.g., "ACCEPTED").
+        </ResponseField>
+        
+        <ResponseField name="playerProfileId" type="string">
+          The ID of the player profile.
+        </ResponseField>
+        
+        <ResponseField name="player" type="Player">
+          The full player profile object containing `id`, `username`, `ownerId`, `customFields`, and `identities`.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the data is currently being fetched. This includes both tournament teams and player data loading states.
+</ResponseField>
+
+### GraphQL Query
+
+This hook uses the following GraphQL query:
+
+```graphql
+query tournamentTeam(
+  $tournamentId: ID!
+  $page: PageInfo!
+  $status: TournamentTeamStatus
+) {
+  tournamentTeams(
+    tournamentId: $tournamentId
+    page: $page
+    memberStatus: ACCEPTED
+    status: $status
+  ) {
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+    nodes {
+      id
+      name
+      status
+      members {
+        status
+        playerProfileId
+      }
+    }
+  }
+}
+```
+
+### Usage Example
+
+```tsx
+import { useTournamentTeams } from '@wellplayed.gg/react-sdk';
+
+const TournamentTeamsList = ({ tournamentId }: { tournamentId: string }) => {
+  const { results, loading } = useTournamentTeams({
+    tournamentId,
+    status: 'CONFIRMED',
+    skip: false,
+  });
+
+  if (loading) {
+    return <div>Loading teams...</div>;
+  }
+
+  return (
+    <div>
+      <h2>Tournament Teams</h2>
+      {results.map((team) => (
+        <div key={team.id}>
+          <h3>{team.name}</h3>
+          <p>Status: {team.status}</p>
+          <h4>Members</h4>
+          <ul>
+            {team.members.map((member) => (
+              <li key={member.playerProfileId}>
+                {member.player.username} (Status: {member.status})
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+### Data Structure
+
+The hook performs two sequential operations:
+
+1. **Fetches tournament teams**: Retrieves all teams for the tournament with pagination.
+2. **Enriches with player data**: Automatically fetches player profiles for all team members using the `usePlayers` hook.
+
+The final `results` array contains teams with their members enriched with full player profile information, making it easy to display player usernames, custom fields, and other profile data.
+
+### Type Definition
+
+```typescript
+type UseTournamentTeamsParams = {
+  tournamentId: string;
+  skip?: boolean;
+  status?: TournamentTeamStatus;
+};
+
+type UseTournamentTeamsReturn = {
+  results: Array<{
+    id: string;
+    name: string;
+    status: string;
+    members: Array<{
+      status: string;
+      playerProfileId: string;
+      player: {
+        id: string;
+        username: string;
+        ownerId: string;
+        customFields: Array<{
+          property: string;
+          value: string;
+        }>;
+        identities: Array<{
+          providerId: string;
+          properties: Array<{
+            property: string;
+            value: string;
+          }>;
+        }>;
+      };
+    }>;
+  }>;
+  loading: boolean;
+};
+
+const useTournamentTeams: (params: UseTournamentTeamsParams) => UseTournamentTeamsReturn;
+```
+
+### Notes
+
+- The query automatically filters for members with `ACCEPTED` status.
+- Uses `usePaginatedLoadAll` internally to handle pagination automatically.
+- Player data is fetched only after team data is loaded to avoid unnecessary requests.
+- The hook waits for both team and player data to load before setting `loading` to `false`.

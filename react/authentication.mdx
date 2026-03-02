@@ -1,0 +1,279 @@
+---
+title: Authentication
+description: Implement OpenID Connect (OIDC) authentication in your React application
+---
+
+## Overview
+
+The WellPlayed React SDK uses OpenID Connect (OIDC) for authentication, powered by `@axa-fr/react-oidc`. This provides a secure, industry-standard authentication flow with support for refresh tokens.
+
+## Getting Your App Client ID
+
+<Steps>
+  <Step title="Access the Console">
+    Navigate to the [WellPlayed Console](https://console.well-played.gg/apps)
+  </Step>
+  
+  <Step title="Create or Select an App">
+    Create a new application or select an existing one
+  </Step>
+  
+  <Step title="Configure Redirect URIs">
+    Add your application's redirect URIs (e.g., `https://yourapp.com/login`)
+  </Step>
+  
+  <Step title="Copy Client ID">
+    Copy the App Client ID to use in your configuration
+  </Step>
+</Steps>
+
+<Note>
+  The redirect URI in your code must **exactly match** one of the redirect URIs configured in the WellPlayed Console.
+</Note>
+
+## Authentication Setup
+
+### Basic Configuration
+
+Configure authentication by passing the `wpAppConfig` to the `WellPlayedProvider`:
+
+```tsx
+import { WellPlayedProvider } from '@well-played.gg/react-sdk';
+
+const App = () => {
+  return (
+    <WellPlayedProvider
+      organizationId="your-organization-id"
+      wpAppConfig={{
+        scope: "offline_access", // Enables refresh tokens
+        client_id: "your-app-client-id",
+        redirect_uri: `${window.location.protocol}//${window.location.host}/login`,
+      }}
+    >
+      {/* Your app components */}
+    </WellPlayedProvider>
+  );
+};
+```
+
+### Understanding the Scope
+
+<ParamField path="scope" type="string" required>
+  The OAuth 2.0 scopes for your application.
+  
+  **Recommended value:** `"offline_access"`
+  
+  This enables refresh tokens, allowing your application to:
+  - Maintain user sessions across browser refreshes
+  - Automatically renew access tokens in the background
+  - Keep users logged in for extended periods
+</ParamField>
+
+### Redirect URI Configuration
+
+The redirect URI is where users return after authentication:
+
+```tsx
+// Dynamic redirect URI based on current host
+redirect_uri: `${window.location.protocol}//${window.location.host}/login`
+
+// Or use a static URI
+redirect_uri: "https://yourapp.com/login"
+```
+
+<Warning>
+  The redirect URI must:
+  1. Match exactly with a URI configured in your App Client settings
+  2. Include a path component (e.g., `/login`), not just the domain
+  3. Use HTTPS in production environments
+</Warning>
+
+## Using Authentication Hooks
+
+### useConnectedPlayer
+
+Access the authenticated user's profile, permissions, and authentication state:
+
+```tsx
+import { useConnectedPlayer } from '@well-played.gg/react-sdk';
+
+const UserProfile = () => {
+  const { 
+    data, 
+    loading, 
+    authenticated, 
+    login, 
+    logout, 
+    refetch 
+  } = useConnectedPlayer();
+
+  if (loading) return <div>Loading...</div>;
+  
+  if (!authenticated) {
+    return <button onClick={login}>Sign In</button>;
+  }
+
+  return (
+    <div>
+      <h1>Welcome, {data?.getMyAccount?.profiles[0]?.username}!</h1>
+      <button onClick={logout}>Sign Out</button>
+    </div>
+  );
+};
+```
+
+### Return Values
+
+<ResponseField name="authenticated" type="boolean">
+  Whether the user is currently authenticated.
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Whether the user data is being fetched.
+</ResponseField>
+
+<ResponseField name="data" type="object | undefined">
+  The authenticated user's account data.
+  
+  <Expandable title="data structure">
+    ```typescript
+    {
+      getMyAccount: {
+        id: string;
+        permissions: Array<{
+          id: string;
+          resources: string[];
+        }>;
+        profiles: Array<{
+          id: string;
+          username: string;
+          customFields: Array<{
+            property: string;
+            value: string;
+          }>;
+        }>;
+        identities: Array<{
+          providerId: string;
+          properties: Array<{
+            property: string;
+            value: string;
+          }>;
+        }>;
+      }
+    }
+    ```
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="login" type="() => void">
+  Function to initiate the login flow.
+</ResponseField>
+
+<ResponseField name="logout" type="() => void">
+  Function to log out the current user.
+</ResponseField>
+
+<ResponseField name="refetch" type="() => Promise<ApolloQueryResult>">
+  Function to refetch the user's account data.
+</ResponseField>
+
+## Authentication Flow
+
+<Steps>
+  <Step title="User initiates login">
+    User clicks a login button that calls the `login()` function from `useConnectedPlayer`
+  </Step>
+  
+  <Step title="Redirect to WellPlayed">
+    User is redirected to WellPlayed's OAuth server for authentication
+  </Step>
+  
+  <Step title="User authenticates">
+    User logs in with their WellPlayed credentials
+  </Step>
+  
+  <Step title="Redirect back to app">
+    User is redirected back to your app's `redirect_uri` with an authorization code
+  </Step>
+  
+  <Step title="Token exchange">
+    The SDK automatically exchanges the code for access and refresh tokens
+  </Step>
+  
+  <Step title="Authenticated state">
+    Your app now has access to the user's profile and can make authenticated API calls
+  </Step>
+</Steps>
+
+## Protected Routes
+
+Create protected routes that require authentication:
+
+```tsx
+import { useConnectedPlayer } from '@well-played.gg/react-sdk';
+import { Navigate } from 'react-router-dom';
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { authenticated, loading } = useConnectedPlayer();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!authenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Usage
+<Route path="/dashboard" element={
+  <ProtectedRoute>
+    <Dashboard />
+  </ProtectedRoute>
+} />
+```
+
+## Accessing User Permissions
+
+Check user permissions to control access to features:
+
+```tsx
+const { data } = useConnectedPlayer();
+
+const userPermissions = data?.getMyAccount?.permissions || [];
+const hasAdminAccess = userPermissions.some(
+  perm => perm.resources.includes('admin')
+);
+
+if (hasAdminAccess) {
+  // Show admin UI
+}
+```
+
+## Working with User Identities
+
+Access linked identity providers:
+
+```tsx
+const { data } = useConnectedPlayer();
+
+const identities = data?.getMyAccount?.identities || [];
+const discordIdentity = identities.find(
+  identity => identity.providerId === 'discord'
+);
+
+if (discordIdentity) {
+  const discordUsername = discordIdentity.properties.find(
+    prop => prop.property === 'username'
+  )?.value;
+}
+```
+
+## Source Reference
+
+Authentication implementation:
+- `players.hook.ts:116-133` - `useConnectedPlayer` hook
+- `players.hook.ts:89-114` - GraphQL query for user account
+- `wp.provider.tsx:96-133` - Authentication provider integration

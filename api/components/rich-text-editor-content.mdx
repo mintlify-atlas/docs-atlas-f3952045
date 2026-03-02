@@ -1,0 +1,76 @@
+---
+title: RichTextEditorContent
+description: A component to securely display HTML-based user content such as tournament descriptions and event descriptions
+---
+
+## RichTextEditorContent
+
+The `RichTextEditorContent` component is a read-only rich text editor that safely renders user-generated content. It uses Tiptap's `EditorProvider` with a predefined set of extensions to display formatted content without allowing editing.
+
+### Props
+
+<ParamField path="content" type="string" required>
+  The HTML content string to render. This should be the raw content from the WellPlayed API.
+</ParamField>
+
+<ParamField path="style" type="React.CSSProperties">
+  Optional CSS styles to apply to the wrapper div container.
+</ParamField>
+
+### Usage Example
+
+```tsx
+import { RichTextEditorContent } from '@wellplayed.gg/react-sdk';
+
+const TournamentDescription = ({ tournament }) => {
+  return (
+    <RichTextEditorContent 
+      content={tournament.description}
+      style={{ padding: '1rem' }}
+    />
+  );
+};
+```
+
+### Included Tiptap Extensions
+
+The component comes pre-configured with the following Tiptap extensions:
+
+- **StarterKit** - Provides basic editing functionality including:
+  - Bold, italic, and code formatting
+  - Headings (h1-h6)
+  - Paragraphs
+  - Bullet and ordered lists
+  - Blockquotes
+  - Code blocks
+  - Horizontal rules
+  - Hard breaks
+  - History (undo/redo)
+
+- **Underline** - Adds underline text formatting support
+
+- **Superscript** - Enables superscript text (e.g., x²)
+
+- **Subscript** - Enables subscript text (e.g., H₂O)
+
+- **Highlight** - Allows text highlighting with background colors
+
+- **TextAlign** - Enables text alignment for headings and paragraphs (left, center, right, justify)
+
+### Type Definition
+
+```typescript
+export const RichTextEditorContent = ({
+  content,
+  style,
+}: {
+  content: string;
+  style?: React.CSSProperties;
+}) => JSX.Element;
+```
+
+### Notes
+
+- The component is **read-only** (`editable={false}`) and should only be used to display content, not edit it.
+- Use this component to securely render user-generated content from tournament descriptions, event descriptions, and other rich text fields from the WellPlayed API.
+- The component handles all necessary sanitization through Tiptap's built-in security features.

@@ -1,0 +1,399 @@
+---
+title: 'Player Profiles'
+description: 'Learn how to fetch and manage player profiles using the WellPlayed React SDK'
+---
+
+## Overview
+
+The WellPlayed React SDK provides hooks for managing player profiles, including fetching multiple players, accessing the authenticated user's profile, and working with player identities and custom fields.
+
+## usePlayers Hook
+
+The `usePlayers` hook fetches player profiles by their IDs, including usernames, identities, and custom fields.
+
+### Basic Usage
+
+```tsx
+import { usePlayers } from '@well-played.gg/react-sdk';
+
+const PlayerList = ({ playerIds }: { playerIds: string[] }) => {
+  const { results: players, loading, refetch } = usePlayers({
+    playerIds,
+  });
+
+  if (loading) {
+    return <div>Loading players...</div>;
+  }
+
+  return (
+    <div>
+      {players.map((player) => (
+        <div key={player.id}>
+          <h3>{player.username}</h3>
+          <p>Owner ID: {player.ownerId}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+### Parameters
+
+<ParamField path="playerIds" type="string[]">
+  Array of player IDs to fetch. The hook automatically handles pagination for large arrays.
+</ParamField>
+
+<ParamField path="skip" type="boolean" default="false">
+  Whether to skip fetching the data
+</ParamField>
+
+### Return Value
+
+<ResponseField name="results" type="Player[]">
+  Array of player profiles
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the data is currently being fetched
+</ResponseField>
+
+<ResponseField name="refetch" type="(playerIds: string[]) => Promise<void>">
+  Function to manually refetch player data with new IDs
+</ResponseField>
+
+<Info>
+  The `usePlayers` hook automatically batches requests in chunks of 100 players to optimize API usage (source: `packages/react-sdk/src/api/hooks/players.hook.ts:56`).
+</Info>
+
+## useConnectedPlayer Hook
+
+The `useConnectedPlayer` hook retrieves the currently authenticated player's profile, including their account information, permissions, and identities.
+
+### Basic Usage
+
+```tsx
+import { useConnectedPlayer } from '@well-played.gg/react-sdk';
+
+const UserProfile = () => {
+  const {
+    data,
+    loading,
+    authenticated,
+    login,
+    logout,
+    refetch,
+  } = useConnectedPlayer();
+
+  if (!authenticated) {
+    return <button onClick={login}>Login</button>;
+  }
+
+  if (loading) {
+    return <div>Loading profile...</div>;
+  }
+
+  const account = data?.getMyAccount;
+
+  return (
+    <div>
+      <h2>My Profile</h2>
+      <p>Account ID: {account?.id}</p>
+      {account?.profiles.map((profile) => (
+        <div key={profile.id}>
+          <h3>{profile.username}</h3>
+        </div>
+      ))}
+      <button onClick={logout}>Logout</button>
+    </div>
+  );
+};
+```
+
+### Return Value
+
+<ResponseField name="data" type="object">
+  Contains the `getMyAccount` object with user data:
+  - `id` - Account ID
+  - `permissions` - User permissions
+  - `profiles` - Player profiles associated with the account
+  - `identities` - Identity provider information
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the profile is being fetched
+</ResponseField>
+
+<ResponseField name="authenticated" type="boolean">
+  Whether the user is currently authenticated
+</ResponseField>
+
+<ResponseField name="login" type="() => void">
+  Function to initiate the login flow
+</ResponseField>
+
+<ResponseField name="logout" type="() => void">
+  Function to log out the current user
+</ResponseField>
+
+<ResponseField name="refetch" type="() => Promise<void>">
+  Function to manually refetch the user profile
+</ResponseField>
+
+<Note>
+  The hook automatically skips fetching when the user is not authenticated (source: `packages/react-sdk/src/api/hooks/players.hook.ts:120`).
+</Note>
+
+## Player Data Structure
+
+Player profiles contain several key pieces of information:
+
+<Steps>
+  <Step title="Basic Information">
+    Every player has an `id`, `username`, and `ownerId`:
+    
+    ```tsx
+    const player = players[0];
+    console.log(player.id);        // Player profile ID
+    console.log(player.username);  // Display name
+    console.log(player.ownerId);   // Account owner ID
+    ```
+  </Step>
+  
+  <Step title="Custom Fields">
+    Players can have custom fields for storing additional metadata:
+    
+    ```tsx
+    {player.customFields?.map((field) => (
+      <div key={field.property}>
+        {field.property}: {field.value}
+      </div>
+    ))}
+    ```
+  </Step>
+  
+  <Step title="Identities">
+    Identities represent authentication providers and their associated data:
+    
+    ```tsx
+    {player.identities?.map((identity) => (
+      <div key={identity.providerId}>
+        <p>Provider: {identity.providerId}</p>
+        {identity.properties.map((prop) => (
+          <span key={prop.property}>
+            {prop.property}: {prop.value}
+          </span>
+        ))}
+      </div>
+    ))}
+    ```
+  </Step>
+</Steps>
+
+## GraphQL Queries
+
+The player hooks use the following GraphQL queries:
+
+### Get Players Query
+
+```graphql
+query players($ids: [ID!]!, $page: PageInfo!) {
+  players(ids: $ids, page: $page) {
+    nodes {
+      id
+      username
+      ownerId
+      customFields {
+        property
+        value
+      }
+      identities {
+        providerId
+        properties {
+          property
+          value
+        }
+      }
+    }
+  }
+}
+```
+
+### Get My Account Query
+
+```graphql
+query getMyAccount {
+  getMyAccount {
+    id
+    permissions {
+      id
+      resources
+    }
+    profiles {
+      id
+      username
+      customFields {
+        property
+        value
+      }
+    }
+    identities {
+      providerId
+      properties {
+        property
+        value
+      }
+    }
+  }
+}
+```
+
+## Authentication Flow
+
+The SDK uses OIDC (OpenID Connect) for authentication. Here's how to set it up:
+
+<Steps>
+  <Step title="Configure WellPlayedProvider">
+    Wrap your app with the `WellPlayedProvider` and configure OIDC:
+    
+    ```tsx
+    import { WellPlayedProvider } from '@well-played.gg/react-sdk';
+
+    function App() {
+      return (
+        <WellPlayedProvider
+          organizationId="your-org-id"
+          wpAppConfig={{
+            client_id: 'your-client-id',
+            redirect_uri: 'http://localhost:3000',
+            scope: 'openid profile offline_access',
+          }}
+        >
+          {/* Your app */}
+        </WellPlayedProvider>
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Use Authentication Hooks">
+    Access authentication state via `useConnectedPlayer`:
+    
+    ```tsx
+    const { authenticated, login, logout } = useConnectedPlayer();
+    
+    if (!authenticated) {
+      return <button onClick={login}>Sign In</button>;
+    }
+    
+    return <button onClick={logout}>Sign Out</button>;
+    ```
+  </Step>
+  
+  <Step title="Access Token Automatically Included">
+    The SDK automatically includes authentication tokens in all API requests (source: `packages/react-sdk/src/wp.provider.tsx:103`).
+  </Step>
+</Steps>
+
+<Tip>
+  Add `offline_access` to your scope to enable token refresh and maintain user sessions across browser restarts.
+</Tip>
+
+## Working with Custom Fields
+
+Custom fields allow you to store additional metadata on player profiles:
+
+```tsx
+const getCustomField = (player: Player, fieldName: string) => {
+  return player.customFields?.find(
+    (field) => field.property === fieldName
+  )?.value;
+};
+
+const PlayerCard = ({ player }: { player: Player }) => {
+  const country = getCustomField(player, 'country');
+  const rank = getCustomField(player, 'rank');
+  
+  return (
+    <div>
+      <h3>{player.username}</h3>
+      {country && <p>Country: {country}</p>}
+      {rank && <p>Rank: {rank}</p>}
+    </div>
+  );
+};
+```
+
+## Working with Identities
+
+Identities connect players to external authentication providers:
+
+```tsx
+const getIdentityProperty = (
+  player: Player,
+  providerId: string,
+  propertyName: string
+) => {
+  const identity = player.identities?.find(
+    (id) => id.providerId === providerId
+  );
+  return identity?.properties.find(
+    (prop) => prop.property === propertyName
+  )?.value;
+};
+
+const PlayerSocial = ({ player }: { player: Player }) => {
+  const discordId = getIdentityProperty(player, 'discord', 'user_id');
+  const twitchName = getIdentityProperty(player, 'twitch', 'display_name');
+  
+  return (
+    <div>
+      {discordId && <p>Discord: {discordId}</p>}
+      {twitchName && <p>Twitch: {twitchName}</p>}
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Handle Loading States">
+    Always check the loading state before accessing player data:
+    
+    ```tsx
+    if (loading) {
+      return <Spinner />;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Batch Player Requests">
+    Instead of making multiple calls with individual IDs, batch them together:
+    
+    ```tsx
+    // Good - Single request
+    const { results } = usePlayers({ playerIds: [id1, id2, id3] });
+    
+    // Bad - Multiple requests
+    const player1 = usePlayers({ playerIds: [id1] });
+    const player2 = usePlayers({ playerIds: [id2] });
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Skip for Conditional Fetching">
+    Prevent unnecessary queries when you don't have player IDs yet:
+    
+    ```tsx
+    const { results } = usePlayers({
+      playerIds,
+      skip: !playerIds || playerIds.length === 0,
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Hooks
+
+- [useTournamentTeams](/guides/teams) - Teams include player member data
+- [useWellPlayed](/guides/error-handling) - Access the WellPlayed provider context

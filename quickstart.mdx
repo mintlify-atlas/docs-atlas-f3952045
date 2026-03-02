@@ -1,80 +1,350 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with WellPlayed React SDK in under 5 minutes
 ---
 
-## Get started in three steps
+This guide will help you integrate WellPlayed into your React application and authenticate your first user.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+- A React application (v19+ recommended)
+- Node.js 18 or higher
+- An account on [WellPlayed Console](https://console.well-played.gg)
+
+## Get Your Credentials
+
+<Steps>
+  <Step title="Create an Organization">
+    Sign in to the [WellPlayed Console](https://console.well-played.gg) and create an organization if you haven't already. Note your **Organization ID** from the dashboard.
+  </Step>
+  
+  <Step title="Create an Application">
+    Navigate to the [Apps section](https://console.well-played.gg/apps) and create a new application. Configure:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    - **Application Name**: Your app's name
+    - **Redirect URIs**: Add `http://localhost:3000/login` for development
+    - **Allowed Origins**: Add `http://localhost:3000` for CORS
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    Save your **Client ID** - you'll need it for the SDK configuration.
+  </Step>
+</Steps>
 
-### Step 2: Deploy your changes
+<Warning>
+  Keep your Organization ID and Client ID secure. Never commit them directly to version control. Use environment variables instead.
+</Warning>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Installation
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
+  <Step title="Install the React SDK">
+    Install the WellPlayed React SDK package:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    <CodeGroup>
+      ```bash npm
+      npm install @well-played.gg/react-sdk
+      ```
 
-### Step 3: Go live
+      ```bash yarn
+      yarn add @well-played.gg/react-sdk
+      ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+      ```bash pnpm
+      pnpm add @well-played.gg/react-sdk
+      ```
+    </CodeGroup>
 
-## Next steps
+    The React SDK automatically includes the TypeScript SDK as a dependency.
+  </Step>
 
-Now that you have your docs running, explore these key features:
+  <Step title="Install Peer Dependencies">
+    Ensure you have React 19+ installed:
 
-<CardGroup cols={2}>
+    <CodeGroup>
+      ```bash npm
+      npm install react@^19.0.0 react-dom@^19.0.0
+      ```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+      ```bash yarn
+      yarn add react@^19.0.0 react-dom@^19.0.0
+      ```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+      ```bash pnpm
+      pnpm add react@^19.0.0 react-dom@^19.0.0
+      ```
+    </CodeGroup>
+  </Step>
+</Steps>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+## Setup the Provider
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+<Steps>
+  <Step title="Wrap Your App with WellPlayedProvider">
+    Import the `WellPlayedProvider` and wrap your application. This component handles authentication, Apollo Client setup, and provides the WellPlayed context.
 
-</CardGroup>
+    ```tsx src/main.tsx
+    import { WellPlayedProvider } from "@well-played.gg/react-sdk";
+    import React from "react";
+    import { createRoot } from "react-dom/client";
+    import { RouterProvider, createBrowserRouter } from "react-router-dom";
+    import { App } from "./App";
+
+    const router = createBrowserRouter([
+      {
+        path: "",
+        element: <App />,
+      },
+    ]);
+
+    const Root = () => (
+      <WellPlayedProvider
+        organizationId="vHFLeYcHvCJS4fmZW4uDrN" // Replace with your organizationId
+        wpAppConfig={{
+          scope: "offline_access",
+          client_id: "9e53e218-d77d-48fd-8bd3-2c4f597b94ef", // Replace with your client_id
+          redirect_uri: `${window.location.origin}/login`,
+        }}
+      >
+        <RouterProvider router={router} />
+      </WellPlayedProvider>
+    );
+
+    const root = createRoot(document.getElementById("root")!);
+    root.render(<Root />);
+    ```
+  </Step>
+
+  <Step title="Understanding the Configuration">
+    The `WellPlayedProvider` accepts several props:
+
+    - **`organizationId`** (required): Your organization ID from the WellPlayed Console
+    - **`wpAppConfig`** (required): Application configuration object:
+      - `client_id`: Your application's client ID
+      - `redirect_uri`: Where users return after authentication (must match console config)
+      - `scope`: OAuth scopes - use `"offline_access"` to enable token refresh
+    - **`apiBaseUrl`** (optional): API environment - defaults to `"well-played.gg"`, use `"stg.well-played.gg"` for staging
+    - **`clientConfig`** (optional): Advanced Apollo Client configuration
+    - **`oidcConfig`** (optional): Additional OIDC provider settings
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The `redirect_uri` must include a path segment (e.g., `/login`). Using just the origin will cause an error. This path doesn't need to exist as a route - the OIDC library handles the callback automatically.
+</Note>
+
+## Authenticate a User
+
+Now let's add authentication to your app using the `useConnectedPlayer` hook.
+
+<Steps>
+  <Step title="Create Your App Component">
+    Use the `useConnectedPlayer` hook to access authentication state and user data:
+
+    ```tsx src/App.tsx
+    import { useConnectedPlayer } from "@well-played.gg/react-sdk";
+    import React from "react";
+
+    export const App = () => {
+      const { authenticated, login, logout, data, loading } = useConnectedPlayer();
+
+      if (loading) {
+        return <div>Loading...</div>;
+      }
+
+      if (!authenticated) {
+        return (
+          <div>
+            <h1>Welcome to WellPlayed</h1>
+            <button onClick={() => login()}>Sign In</button>
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          <h1>Welcome, {data?.getMyAccount?.profiles[0]?.username}!</h1>
+          <button onClick={() => logout()}>Sign Out</button>
+          
+          <div>
+            <h2>Your Profile</h2>
+            <pre>{JSON.stringify(data?.getMyAccount, null, 2)}</pre>
+          </div>
+        </div>
+      );
+    };
+    ```
+  </Step>
+
+  <Step title="Test Authentication">
+    Run your application and click the "Sign In" button:
+
+    ```bash
+    npm run dev
+    ```
+
+    You'll be redirected to the WellPlayed authentication page. After signing in, you'll return to your app with the user's profile data.
+  </Step>
+</Steps>
+
+## Fetch Player Data
+
+Let's extend the example to fetch multiple player profiles using the `usePlayers` hook.
+
+```tsx src/PlayerList.tsx
+import { usePlayers } from "@well-played.gg/react-sdk";
+import React from "react";
+
+export const PlayerList = () => {
+  const { results, loading, refetch } = usePlayers({
+    playerIds: ["player-id-1", "player-id-2", "player-id-3"],
+  });
+
+  if (loading) {
+    return <div>Loading players...</div>;
+  }
+
+  return (
+    <div>
+      <h2>Players</h2>
+      <ul>
+        {results.map((player) => (
+          <li key={player.id}>
+            <strong>{player.username}</strong>
+            {player.identities.map((identity) => (
+              <div key={identity.providerId}>
+                {identity.providerId}:
+                {identity.properties.map((prop) => (
+                  <span key={prop.property}>
+                    {prop.property} = {prop.value}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
+      <button onClick={() => refetch(["player-id-1", "player-id-2"])}>Refresh</button>
+    </div>
+  );
+};
+```
+
+<Note>
+  The `usePlayers` hook automatically handles pagination and batching. It fetches up to 100 players per request and combines the results.
+</Note>
+
+## Access the GraphQL Client
+
+For advanced use cases, you can access the underlying Apollo Client or typed client:
+
+```tsx src/CustomQuery.tsx
+import { useWellPlayed, graphql } from "@well-played.gg/react-sdk";
+import { useQuery } from "@apollo/client";
+import React from "react";
+
+const GET_TOURNAMENT_QUERY = graphql(`
+  query getTournament($id: ID!) {
+    tournament(id: $id) {
+      id
+      name
+      status
+    }
+  }
+`);
+
+export const TournamentDetails = ({ tournamentId }: { tournamentId: string }) => {
+  const { apiClient } = useWellPlayed();
+  const { data, loading } = useQuery(GET_TOURNAMENT_QUERY, {
+    client: apiClient,
+    variables: { id: tournamentId },
+  });
+
+  if (loading) return <div>Loading tournament...</div>;
+
+  return (
+    <div>
+      <h2>{data?.tournament?.name}</h2>
+      <p>Status: {data?.tournament?.status}</p>
+    </div>
+  );
+};
+```
+
+## What's Available in the Context
+
+The `useWellPlayed` hook provides access to:
+
+```typescript
+const {
+  organizationId,    // Your organization ID
+  apiClient,         // Apollo Client instance
+  typedClient,       // Typed GraphQL client
+  accessToken,       // Current OAuth access token
+} = useWellPlayed();
+```
+
+Source: `wp.provider.tsx:86-94`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explore React Hooks" icon="hook" href="/react/hooks">
+    Learn about all available hooks for tournaments, teams, and players
+  </Card>
+  <Card title="Tournament Guide" icon="trophy" href="/guides/tournaments">
+    Build a complete tournament bracket system
+  </Card>
+  <Card title="TypeScript SDK" icon="code" href="/typescript/installation">
+    Use the typed client for server-side or non-React applications
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/hooks/use-wellplayed">
+    Browse the complete API documentation
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Error: redirect_uri must include a path">
+    Make sure your `redirect_uri` includes a path segment:
+    
+    ```tsx
+    // ❌ Wrong
+    redirect_uri: window.location.origin
+    
+    // ✅ Correct
+    redirect_uri: `${window.location.origin}/login`
+    ```
+  </Accordion>
+
+  <Accordion title="Error: useWellPlayed must be used within a WellPlayedProvider">
+    Ensure your component is rendered inside the `WellPlayedProvider`:
+    
+    ```tsx
+    // ✅ Correct structure
+    <WellPlayedProvider ...>
+      <App /> {/* Can use useWellPlayed here */}
+    </WellPlayedProvider>
+    ```
+  </Accordion>
+
+  <Accordion title="CORS errors during authentication">
+    Verify that you've added your application's origin to the **Allowed Origins** list in the WellPlayed Console app configuration.
+  </Accordion>
+
+  <Accordion title="Token not refreshing">
+    Make sure you include `offline_access` in the scope:
+    
+    ```tsx
+    wpAppConfig={{
+      scope: "offline_access",  // Required for token refresh
+      // ...
+    }}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  For more examples and advanced usage patterns, check out the [demo application](https://github.com/WellPlayedGG/react-sdk/tree/master/demo) in the SDK repository.
 </Note>

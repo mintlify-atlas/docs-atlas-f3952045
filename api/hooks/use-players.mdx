@@ -1,0 +1,159 @@
+---
+title: usePlayers
+description: Fetch player profiles by ID with pagination support
+---
+
+## usePlayers
+
+The `usePlayers` hook fetches player profiles by their IDs. It automatically handles pagination to retrieve all requested players, fetching up to 100 players per request.
+
+### Parameters
+
+<ParamField path="playerIds" type="string[]">
+  An array of player IDs to fetch. The hook will automatically paginate through all IDs in batches of 100.
+</ParamField>
+
+<ParamField path="skip" type="boolean" default={false}>
+  Whether to skip fetching the data. When `true`, the query will not execute.
+</ParamField>
+
+### Returns
+
+<ResponseField name="results" type="Player[]">
+  An array of player objects containing their profile information.
+  
+  <Expandable title="Player properties">
+    <ResponseField name="id" type="string">
+      The unique identifier for the player.
+    </ResponseField>
+    
+    <ResponseField name="username" type="string">
+      The player's username.
+    </ResponseField>
+    
+    <ResponseField name="ownerId" type="string">
+      The owner ID associated with the player.
+    </ResponseField>
+    
+    <ResponseField name="customFields" type="Array<{ property: string; value: string }>">
+      Custom fields associated with the player profile.
+    </ResponseField>
+    
+    <ResponseField name="identities" type="Array<{ providerId: string; properties: Array<{ property: string; value: string }> }>">
+      Authentication provider identities linked to the player.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the query is currently loading.
+</ResponseField>
+
+<ResponseField name="refetch" type="(playerIds: string[]) => Promise<void>">
+  A function to manually refetch players with new player IDs.
+</ResponseField>
+
+### GraphQL Query
+
+This hook uses the following GraphQL query:
+
+```graphql
+query players(
+  $ids: [ID!]!
+  $page: PageInfo!
+) {
+  players(
+    ids: $ids
+    page: $page
+  ) {
+    nodes {
+      id
+      username
+      ownerId
+      customFields {
+        property
+        value
+      }
+      identities {
+        providerId
+        properties {
+          property
+          value
+        }
+      }
+    }
+  }
+}
+```
+
+### Usage Example
+
+```tsx
+import { usePlayers } from '@wellplayed.gg/react-sdk';
+
+const PlayerList = ({ playerIds }: { playerIds: string[] }) => {
+  const { results, loading, refetch } = usePlayers({
+    playerIds,
+    skip: false,
+  });
+
+  if (loading) {
+    return <div>Loading players...</div>;
+  }
+
+  return (
+    <div>
+      {results.map((player) => (
+        <div key={player.id}>
+          <h3>{player.username}</h3>
+          <p>ID: {player.id}</p>
+          <p>Owner: {player.ownerId}</p>
+        </div>
+      ))}
+      <button onClick={() => refetch(playerIds)}>
+        Refresh Players
+      </button>
+    </div>
+  );
+};
+```
+
+### Type Definition
+
+```typescript
+type UsePlayersParams = {
+  playerIds?: string[];
+  skip?: boolean;
+};
+
+type UsePlayersReturn = {
+  results: Player[];
+  loading: boolean;
+  refetch: (playerIds: string[]) => Promise<void>;
+};
+
+type Player = {
+  id: string;
+  username: string;
+  ownerId: string;
+  customFields: Array<{
+    property: string;
+    value: string;
+  }>;
+  identities: Array<{
+    providerId: string;
+    properties: Array<{
+      property: string;
+      value: string;
+    }>;
+  }>;
+};
+
+const usePlayers: (params: UsePlayersParams) => UsePlayersReturn;
+```
+
+### Notes
+
+- The hook automatically batches requests in groups of 100 player IDs to handle pagination.
+- All player IDs are fetched automatically when the component mounts (unless `skip` is `true`).
+- Uses the Apollo GraphQL client from `useWellPlayed` context.

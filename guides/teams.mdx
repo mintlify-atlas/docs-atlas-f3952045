@@ -1,0 +1,411 @@
+---
+title: 'Team Management'
+description: 'Learn how to fetch and manage tournament teams using the WellPlayed React SDK'
+---
+
+## Overview
+
+The WellPlayed React SDK provides the `useTournamentTeams` hook for fetching tournament teams along with their members and player profiles. This hook automatically combines team data with player information for easy rendering.
+
+## useTournamentTeams Hook
+
+The `useTournamentTeams` hook fetches all teams for a tournament, including team members and their associated player profiles.
+
+### Basic Usage
+
+```tsx
+import { useTournamentTeams } from '@well-played.gg/react-sdk';
+import { useParams } from 'react-router-dom';
+
+const TournamentTeams = () => {
+  const { id } = useParams<{ id: string }>();
+  const { loading, results: teams } = useTournamentTeams({
+    tournamentId: id ?? '',
+  });
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      {teams.map((team) => (
+        <div key={team.id}>
+          <h3>{team.name}</h3>
+          <p>Status: {team.status}</p>
+          <ul>
+            {team.members.map((member) => (
+              <li key={member.playerProfileId}>
+                {member.player.username} - {member.status}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+<Info>
+  The hook automatically fetches player profiles for all team members, so you don't need to make separate queries (source: `packages/react-sdk/src/api/hooks/teams.hook.ts:84`).
+</Info>
+
+### Parameters
+
+<ParamField path="tournamentId" type="string" required>
+  The ID of the tournament to fetch teams for
+</ParamField>
+
+<ParamField path="skip" type="boolean" default="false">
+  Whether to skip fetching the data
+</ParamField>
+
+<ParamField path="status" type="TournamentTeamStatus">
+  Filter teams by their status. Possible values:
+  - `REGISTERED` - Team has registered but not confirmed
+  - `CONFIRMED` - Team is confirmed and active
+  - `AWAITING_FOR_PRESENCE_CONFIRMATION` - Waiting for presence check
+  - Other status values as defined by your tournament configuration
+</ParamField>
+
+### Return Value
+
+<ResponseField name="results" type="Team[]">
+  Array of tournament teams with the following structure:
+  - `id` - Team ID
+  - `name` - Team name
+  - `status` - Team status
+  - `members` - Array of team members with player profiles
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether the data is currently being fetched. This is `true` while fetching both teams and player profiles.
+</ResponseField>
+
+## Team Data Structure
+
+Each team object contains complete member information:
+
+```tsx
+type Team = {
+  id: string;
+  name: string;
+  status: 'REGISTERED' | 'CONFIRMED' | 'AWAITING_FOR_PRESENCE_CONFIRMATION';
+  members: {
+    status: string;
+    playerProfileId: string;
+    player: {
+      id: string;
+      username: string;
+      ownerId: string;
+      customFields?: Array<{
+        property: string;
+        value: string;
+      }>;
+      identities?: Array<{
+        providerId: string;
+        properties: Array<{
+          property: string;
+          value: string;
+        }>;
+      }>;
+    };
+  }[];
+};
+```
+
+## Filtering Teams by Status
+
+You can filter teams by their status to show only confirmed or registered teams:
+
+```tsx
+const ConfirmedTeams = ({ tournamentId }: { tournamentId: string }) => {
+  const { loading, results: teams } = useTournamentTeams({
+    tournamentId,
+    status: 'CONFIRMED',
+  });
+
+  return (
+    <div>
+      <h2>Confirmed Teams ({teams.length})</h2>
+      {teams.map((team) => (
+        <TeamCard key={team.id} team={team} />
+      ))}
+    </div>
+  );
+};
+```
+
+<Note>
+  The hook automatically filters for members with `ACCEPTED` status (source: `packages/react-sdk/src/api/hooks/teams.hook.ts:16`).
+</Note>
+
+## Complete Example
+
+Here's a real-world example from the WellPlayed demo application showing how to organize teams by status (source: `demo/src/features/tournaments/tournament-teams.tsx:1`):
+
+```tsx
+import { useTournamentTeams } from '@well-played.gg/react-sdk';
+import React from 'react';
+import { useParams } from 'react-router-dom';
+
+export const TournamentTeams = () => {
+  const { id } = useParams<{ id: string }>();
+  const { loading, results: teams } = useTournamentTeams({
+    tournamentId: id ?? '',
+  });
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+  
+  const confirmedTeams = teams?.filter((team) => team.status === 'CONFIRMED');
+  const registeredTeams = teams?.filter(
+    (team) =>
+      team.status === 'REGISTERED' ||
+      team.status === 'AWAITING_FOR_PRESENCE_CONFIRMATION',
+  );
+  
+  return (
+    <div>
+      <h1>Confirmed teams</h1>
+      {confirmedTeams?.map((team) => (
+        <div key={team.id}>
+          {team.name}
+          <br />
+          {team.members.map(
+            (member) => `${member.player?.username} - ${member.status}`,
+          )}
+        </div>
+      ))}
+      <h1>Registered teams</h1>
+      {registeredTeams?.map((team) => (
+        <div key={team.id}>
+          {team.name}
+          <br />
+          {team.members.map(
+            (member) => `${member.player?.username} - ${member.status}`,
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+## Working with Team Members
+
+Team members include both member status and complete player profile information:
+
+<Steps>
+  <Step title="Access Member Status">
+    Each member has their own status indicating their relationship with the team:
+    
+    ```tsx
+    {team.members.map((member) => (
+      <div key={member.playerProfileId}>
+        <p>Status: {member.status}</p>
+      </div>
+    ))}
+    ```
+  </Step>
+  
+  <Step title="Access Player Information">
+    The `player` object contains complete profile data:
+    
+    ```tsx
+    {team.members.map((member) => (
+      <div key={member.playerProfileId}>
+        <h4>{member.player.username}</h4>
+        <p>Player ID: {member.player.id}</p>
+      </div>
+    ))}
+    ```
+  </Step>
+  
+  <Step title="Access Custom Fields">
+    Player custom fields are available through the member's player object:
+    
+    ```tsx
+    {team.members.map((member) => (
+      <div key={member.playerProfileId}>
+        {member.player.customFields?.map((field) => (
+          <span key={field.property}>
+            {field.property}: {field.value}
+          </span>
+        ))}
+      </div>
+    ))}
+    ```
+  </Step>
+</Steps>
+
+## GraphQL Query
+
+The `useTournamentTeams` hook uses the following GraphQL query:
+
+```graphql
+query tournamentTeam(
+  $tournamentId: ID!
+  $page: PageInfo!
+  $status: TournamentTeamStatus
+) {
+  tournamentTeams(
+    tournamentId: $tournamentId
+    page: $page
+    memberStatus: ACCEPTED
+    status: $status
+  ) {
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+    nodes {
+      id
+      name
+      status
+      members {
+        status
+        playerProfileId
+      }
+    }
+  }
+}
+```
+
+<Tip>
+  The hook automatically handles pagination and fetches all teams regardless of the total count (source: `packages/react-sdk/src/api/hooks/teams.hook.ts:65`).
+</Tip>
+
+## Team Status Values
+
+Teams can have different statuses throughout a tournament lifecycle:
+
+<Card title="REGISTERED" icon="user-plus">
+  Team has registered for the tournament but hasn't been confirmed yet.
+</Card>
+
+<Card title="CONFIRMED" icon="check-circle">
+  Team is confirmed and actively participating in the tournament.
+</Card>
+
+<Card title="AWAITING_FOR_PRESENCE_CONFIRMATION" icon="clock">
+  Team is waiting for presence confirmation before matches begin.
+</Card>
+
+## Advanced Usage
+
+### Combining with Tournament Steps
+
+You can use teams data alongside tournament step data:
+
+```tsx
+import { useTournamentStep, useTournamentTeams } from '@well-played.gg/react-sdk';
+
+const TournamentBracket = ({ tournamentId, stepId }) => {
+  const { loading: loadingStep, groups } = useTournamentStep({
+    tournamentId,
+    stepId,
+  });
+  
+  const { loading: loadingTeams, results: teams } = useTournamentTeams({
+    tournamentId,
+    status: 'CONFIRMED',
+  });
+  
+  if (loadingStep || loadingTeams) {
+    return <div>Loading...</div>;
+  }
+  
+  // Render bracket with team information
+};
+```
+
+<Warning>
+  Both hooks will be loading simultaneously. Make sure to check both loading states before rendering.
+</Warning>
+
+### Filtering and Sorting
+
+Create custom filters and sorts for team lists:
+
+```tsx
+const TeamList = ({ tournamentId }: { tournamentId: string }) => {
+  const { loading, results: teams } = useTournamentTeams({ tournamentId });
+  
+  if (loading) return <div>Loading...</div>;
+  
+  // Sort teams by name
+  const sortedTeams = [...teams].sort((a, b) => 
+    a.name.localeCompare(b.name)
+  );
+  
+  // Filter teams with full rosters
+  const fullTeams = teams.filter(
+    (team) => team.members.length >= 5
+  );
+  
+  return (
+    <div>
+      <h2>All Teams (Sorted)</h2>
+      {sortedTeams.map((team) => (
+        <TeamCard key={team.id} team={team} />
+      ))}
+      
+      <h2>Full Rosters</h2>
+      {fullTeams.map((team) => (
+        <TeamCard key={team.id} team={team} />
+      ))}
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Handle Empty States">
+    Always check for empty results and provide helpful feedback:
+    
+    ```tsx
+    if (!loading && teams.length === 0) {
+      return <div>No teams registered yet</div>;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Status Filters">
+    Filter teams on the server side using the status parameter instead of filtering in your component:
+    
+    ```tsx
+    // Good - Server-side filtering
+    const { results } = useTournamentTeams({
+      tournamentId,
+      status: 'CONFIRMED',
+    });
+    
+    // Less efficient - Client-side filtering
+    const { results } = useTournamentTeams({ tournamentId });
+    const confirmed = results.filter(t => t.status === 'CONFIRMED');
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Missing Player Data">
+    Use optional chaining when accessing player data to handle edge cases:
+    
+    ```tsx
+    {team.members.map((member) => (
+      <div key={member.playerProfileId}>
+        {member.player?.username ?? 'Unknown Player'}
+      </div>
+    ))}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Hooks
+
+- [usePlayers](/guides/player-profiles) - Fetch player profiles directly
+- [useTournamentStep](/guides/tournaments) - Fetch tournament bracket data
+- [usePaginatedLoadAll](/guides/error-handling) - Understand pagination patterns

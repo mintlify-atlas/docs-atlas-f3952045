@@ -1,0 +1,299 @@
+---
+title: useTournamentStep
+description: Fetch tournament step structure with rounds, games, matches, and team scores
+---
+
+## useTournamentStep
+
+The `useTournamentStep` hook fetches the complete structure of a tournament step, including all groups, rounds, games, matches, and team scores. It combines data from multiple sources to provide a fully enriched tournament bracket or group stage structure.
+
+### Parameters
+
+<ParamField path="stepId" type="string" required>
+  The unique identifier of the tournament step.
+</ParamField>
+
+<ParamField path="tournamentId" type="string" required>
+  The unique identifier of the tournament. Required to fetch team information.
+</ParamField>
+
+<ParamField path="skip" type="boolean" default={false}>
+  Whether to skip fetching the data. When `true`, all queries will not execute.
+</ParamField>
+
+### Returns
+
+<ResponseField name="loading" type="boolean">
+  Indicates whether any of the data (step shape, scores, or teams) is currently being fetched.
+</ResponseField>
+
+<ResponseField name="groups" type="Group[] | undefined">
+  An array of groups in the tournament step, each containing rounds, games, matches, and team scores.
+  
+  <Expandable title="Group structure">
+    <ResponseField name="id" type="string">
+      The unique identifier for the group.
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The name of the group.
+    </ResponseField>
+    
+    <ResponseField name="rounds" type="Round[]">
+      Array of rounds in this group.
+      
+      <Expandable title="Round properties">
+        <ResponseField name="id" type="string">
+          The unique identifier for the round.
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          The name of the round.
+        </ResponseField>
+        
+        <ResponseField name="order" type="number">
+          The order of the round in the group.
+        </ResponseField>
+        
+        <ResponseField name="games" type="Game[]">
+          Array of games in this round.
+          
+          <Expandable title="Game properties">
+            <ResponseField name="id" type="string">
+              The unique identifier for the game.
+            </ResponseField>
+            
+            <ResponseField name="order" type="number">
+              The order of the game in the round.
+            </ResponseField>
+            
+            <ResponseField name="matches" type="Match[]">
+              Array of matches in this game.
+              
+              <Expandable title="Match properties">
+                <ResponseField name="id" type="string">
+                  The unique identifier for the match.
+                </ResponseField>
+                
+                <ResponseField name="order" type="number">
+                  The order of the match in the game.
+                </ResponseField>
+                
+                <ResponseField name="status" type="string">
+                  The current status of the match.
+                </ResponseField>
+                
+                <ResponseField name="teamScores" type="TeamScore[]">
+                  Array of team scores for this match.
+                  
+                  <Expandable title="TeamScore properties">
+                    <ResponseField name="score" type="number">
+                      The team's score in this match.
+                    </ResponseField>
+                    
+                    <ResponseField name="id" type="string">
+                      The team ID.
+                    </ResponseField>
+                    
+                    <ResponseField name="name" type="string">
+                      The team name.
+                    </ResponseField>
+                    
+                    <ResponseField name="status" type="string">
+                      The team's tournament status.
+                    </ResponseField>
+                    
+                    <ResponseField name="members" type="TeamMember[]">
+                      Array of team members with their player information.
+                    </ResponseField>
+                  </Expandable>
+                </ResponseField>
+              </Expandable>
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### GraphQL Queries
+
+This hook uses two GraphQL queries:
+
+#### Tournament Step Shape Query
+
+```graphql
+query tournamentStepGeneratedShape($stepId: ID!) {
+  tournamentStepGeneratedShape(stepId: $stepId) {
+    id
+    name
+    rounds {
+      id
+      name
+      order
+      games {
+        id
+        order
+        matches {
+          id
+          order
+          status
+        }
+      }
+    }
+  }
+}
+```
+
+#### Tournament Step Scores Query
+
+```graphql
+query tournamentStepGroupRoundGameMatchScoresGetForStep($stepId: ID!, $page: PageInfo!) {
+  tournamentStepGroupRoundGameMatchScoresGetForStep(
+    stepId: $stepId
+    page: $page
+  ) {
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+    nodes {
+      teamId
+      status
+      score
+      matchId
+    }
+  }
+}
+```
+
+### Usage Example
+
+```tsx
+import { useTournamentStep } from '@wellplayed.gg/react-sdk';
+
+const TournamentBracket = ({
+  tournamentId,
+  stepId,
+}: {
+  tournamentId: string;
+  stepId: string;
+}) => {
+  const { groups, loading } = useTournamentStep({
+    tournamentId,
+    stepId,
+    skip: false,
+  });
+
+  if (loading) {
+    return <div>Loading tournament bracket...</div>;
+  }
+
+  return (
+    <div>
+      {groups?.map((group) => (
+        <div key={group.id}>
+          <h2>{group.name}</h2>
+          {group.rounds.map((round) => (
+            <div key={round.id}>
+              <h3>Round {round.order}: {round.name}</h3>
+              {round.games.map((game) => (
+                <div key={game.id}>
+                  <h4>Game {game.order}</h4>
+                  {game.matches.map((match) => (
+                    <div key={match.id}>
+                      <p>Match {match.order} - Status: {match.status}</p>
+                      {match.teamScores.map((teamScore) => (
+                        <div key={teamScore.id}>
+                          <span>{teamScore.name}: {teamScore.score}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+### Tournament Step Structure
+
+The hook performs three parallel data fetches:
+
+1. **Step shape**: Fetches the structure of groups, rounds, games, and matches
+2. **Scores**: Fetches all team scores for all matches in the step
+3. **Teams**: Fetches all confirmed teams with their member data
+
+The data is then combined to create a fully enriched structure where:
+- Each match contains its team scores
+- Each team score includes the full team object with members and player data
+- The structure maintains the hierarchy: Group → Round → Game → Match → TeamScore
+
+### Type Definition
+
+```typescript
+type UseTournamentStepParams = {
+  stepId: string;
+  tournamentId: string;
+  skip?: boolean;
+};
+
+type TeamScore = {
+  score: number;
+  id: string;
+  name: string;
+  status: string;
+  members: Array<{
+    status: string;
+    playerProfileId: string;
+    player: Player;
+  }>;
+};
+
+type Match = {
+  id: string;
+  order: number;
+  status: string;
+  teamScores: TeamScore[];
+};
+
+type Game = {
+  id: string;
+  order: number;
+  matches: Match[];
+};
+
+type Round = {
+  id: string;
+  name: string;
+  order: number;
+  games: Game[];
+};
+
+type Group = {
+  id: string;
+  name: string;
+  rounds: Round[];
+};
+
+type UseTournamentStepReturn = {
+  loading: boolean;
+  groups: Group[] | undefined;
+};
+
+const useTournamentStep: (params: UseTournamentStepParams) => UseTournamentStepReturn;
+```
+
+### Notes
+
+- Uses `lodash.cloneDeep` to avoid mutating the original data structure.
+- Automatically filters teams by `CONFIRMED` status.
+- Combines data from three different queries to create the complete structure.
+- Logs a warning if a score references a team that doesn't exist.
+- Uses `useTournamentTeams` internally, which in turn uses `usePlayers` to enrich team member data.
